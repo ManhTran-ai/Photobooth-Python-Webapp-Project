@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Photobooth{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Welcome to Photobooth App!</h2>
+    <p>Capture photos and apply amazing filters!</p>
+    
+    <div id="camera-section">
+        <video id="video" width="640" height="480" autoplay></video>
+        <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+        <button id="start-camera">Start Camera</button>
+        <button id="capture">Capture Photo</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+{% endblock %}
