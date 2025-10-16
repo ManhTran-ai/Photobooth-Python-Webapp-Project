@@ -1,21 +1,99 @@
-{% extends "base.html" %}
-
-{% block title %}Home - Photobooth{% endblock %}
-
+{% extends "base.html" %} {% block title %}Trang Chủ - Photobooth{% endblock %}
 {% block content %}
-<div class="container">
-    <h2>Welcome to Photobooth App!</h2>
-    <p>Capture photos and apply amazing filters!</p>
-    
-    <div id="camera-section">
-        <video id="video" width="640" height="480" autoplay></video>
-        <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
-        <button id="start-camera">Start Camera</button>
-        <button id="capture">Capture Photo</button>
+<!-- Hero Section -->
+<section class="hero">
+  <div class="hero-content">
+    <h1 class="hero-title">📸 Photobooth Studio</h1>
+    <p class="hero-subtitle">Chụp ảnh đẹp và áp dụng bộ lọc tuyệt vời</p>
+    <div class="hero-buttons">
+      <button id="start-camera" class="btn btn-primary">
+        <i class="icon">📷</i>
+        Bắt đầu chụp ảnh
+      </button>
+      <a href="/gallery" class="btn btn-secondary">
+        <i class="icon">🖼️</i>
+        Xem thư viện
+      </a>
     </div>
-</div>
-{% endblock %}
+  </div>
+</section>
 
-{% block scripts %}
+<!-- Camera Section -->
+<section class="camera-section" id="camera-section" style="display: none">
+  <div class="camera-container">
+    <div class="camera-wrapper">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="canvas" style="display: none"></canvas>
+
+      <!-- Camera Controls -->
+      <div class="camera-controls">
+        <button id="capture" class="btn btn-capture">
+          <i class="icon">📸</i>
+          Chụp ảnh
+        </button>
+        <button id="toggle-camera" class="btn btn-toggle">
+          <i class="icon">🔄</i>
+          Đổi camera
+        </button>
+        <button id="close-camera" class="btn btn-close">
+          <i class="icon">❌</i>
+          Đóng
+        </button>
+      </div>
+
+      <!-- Filter Preview -->
+      <div class="filter-preview">
+        <h3>Bộ lọc có sẵn:</h3>
+        <div class="filter-buttons">
+          <button class="filter-btn active" data-filter="none">Gốc</button>
+          <button class="filter-btn" data-filter="sepia">Sepia</button>
+          <button class="filter-btn" data-filter="grayscale">Đen trắng</button>
+          <button class="filter-btn" data-filter="vintage">Vintage</button>
+          <button class="filter-btn" data-filter="bright">Sáng</button>
+          <button class="filter-btn" data-filter="contrast">Tương phản</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features Section -->
+<section class="features">
+  <div class="container">
+    <h2>Tính năng nổi bật</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">📷</div>
+        <h3>Chụp ảnh trực tiếp</h3>
+        <p>Chụp ảnh từ camera với chất lượng cao và độ phân giải tốt</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎨</div>
+        <h3>Bộ lọc đa dạng</h3>
+        <p>Nhiều bộ lọc đẹp mắt để tạo ra những bức ảnh độc đáo</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💾</div>
+        <h3>Lưu trữ an toàn</h3>
+        <p>Lưu trữ ảnh của bạn một cách an toàn và dễ dàng truy cập</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Recent Photos Preview -->
+<section class="recent-photos">
+  <div class="container">
+    <h2>Ảnh gần đây</h2>
+    <div class="photos-grid" id="recent-photos">
+      <!-- Photos will be loaded here via JavaScript -->
+    </div>
+    <div class="text-center">
+      <a href="/gallery" class="btn btn-outline">Xem tất cả ảnh</a>
+    </div>
+  </div>
+</section>
+{% endblock %} {% block scripts %}
 <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+<script src="{{ url_for('static', filename='js/home.js') }}"></script>
 {% endblock %}

@@ -1,25 +1,158 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Photobooth App{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Photobooth Studio{% endblock %}</title>
+    <meta
+      name="description"
+      content="Ứng dụng chụp ảnh với bộ lọc đẹp mắt và tính năng chỉnh sửa chuyên nghiệp"
+    />
+    <meta
+      name="keywords"
+      content="photobooth, chụp ảnh, bộ lọc, chỉnh sửa ảnh"
+    />
+
+    <!-- Favicon -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📸</text></svg>"
+    />
+
+    <!-- Stylesheets -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+
+    <!-- Preload critical resources -->
+    <link
+      rel="preload"
+      href="{{ url_for('static', filename='js/camera.js') }}"
+      as="script"
+    />
+
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body>
+    <!-- Navigation -->
     <nav>
-        <h1>📸 Photobooth App</h1>
-        <ul>
-            <li><a href="/">Home</a></li>
-            <li><a href="/gallery">Gallery</a></li>
+      <div class="container">
+        <div class="nav-brand">
+          <h1>📸 Photobooth Studio</h1>
+          <span class="nav-subtitle">Ứng dụng chụp ảnh chuyên nghiệp</span>
+        </div>
+
+        <ul class="nav-menu">
+          <li>
+            <a
+              href="/"
+              class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
+            >
+              <span class="nav-icon">🏠</span>
+              Trang chủ
+            </a>
+          </li>
+          <li>
+            <a
+              href="/gallery"
+              class="nav-link {% if request.endpoint == 'gallery' %}active{% endif %}"
+            >
+              <span class="nav-icon">🖼️</span>
+              Thư viện
+            </a>
+          </li>
+          <li>
+            <a href="/about" class="nav-link">
+              <span class="nav-icon">ℹ️</span>
+              Giới thiệu
+            </a>
+          </li>
         </ul>
+
+        <button class="mobile-menu-toggle" aria-label="Menu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
     </nav>
 
-    <main>
-        {% block content %}{% endblock %}
-    </main>
+    <!-- Main Content -->
+    <main>{% block content %}{% endblock %}</main>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-section">
+            <h3>📸 Photobooth Studio</h3>
+            <p>
+              Ứng dụng chụp ảnh với bộ lọc đẹp mắt và tính năng chỉnh sửa chuyên
+              nghiệp.
+            </p>
+          </div>
+
+          <div class="footer-section">
+            <h4>Liên kết nhanh</h4>
+            <ul>
+              <li><a href="/">Trang chủ</a></li>
+              <li><a href="/gallery">Thư viện</a></li>
+              <li><a href="/about">Giới thiệu</a></li>
+            </ul>
+          </div>
+
+          <div class="footer-section">
+            <h4>Tính năng</h4>
+            <ul>
+              <li>Chụp ảnh trực tiếp</li>
+              <li>Bộ lọc đa dạng</li>
+              <li>Lưu trữ an toàn</li>
+              <li>Giao diện thân thiện</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="footer-bottom">
+          <p>&copy; 2024 Photobooth Studio. Được phát triển với ❤️.</p>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+      // Mobile navigation toggle
+      document.addEventListener("DOMContentLoaded", function () {
+        const mobileToggle = document.querySelector(".mobile-menu-toggle");
+        const navMenu = document.querySelector(".nav-menu");
+
+        if (mobileToggle && navMenu) {
+          mobileToggle.addEventListener("click", function () {
+            navMenu.classList.toggle("mobile-open");
+            mobileToggle.classList.toggle("active");
+          });
+
+          // Close menu when clicking on a link
+          navMenu.addEventListener("click", function (e) {
+            if (e.target.classList.contains("nav-link")) {
+              navMenu.classList.remove("mobile-open");
+              mobileToggle.classList.remove("active");
+            }
+          });
+        }
+
+        // Add scroll effect to navigation
+        window.addEventListener("scroll", function () {
+          const nav = document.querySelector("nav");
+          if (window.scrollY > 100) {
+            nav.classList.add("scrolled");
+          } else {
+            nav.classList.remove("scrolled");
+          }
+        });
+      });
+    </script>
+
     {% block scripts %}{% endblock %}
-</body>
+  </body>
 </html>
