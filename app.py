@@ -28,6 +28,10 @@ def create_app(config_name='default'):
     def health_check():
         return jsonify({'status': 'ok', 'message': 'Photobooth API is running'})
 
+    @app.route('/about')
+    def about():
+        return render_template('about.html')
+
     return app
 
 
