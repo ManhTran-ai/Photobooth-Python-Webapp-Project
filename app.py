@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 from config import config
+from routes.api import api_bp
 import os
 
 
@@ -14,6 +15,9 @@ def create_app(config_name='default'):
                    app.config['THUMBNAILS_FOLDER']]:
         os.makedirs(folder, exist_ok=True)
 
+    # Register blueprints
+    app.register_blueprint(api_bp, url_prefix='/api')
+
     # Basic routes
     @app.route('/')
     def index():
@@ -22,11 +26,6 @@ def create_app(config_name='default'):
     @app.route('/gallery')
     def gallery():
         return render_template('gallery.html')
-
-    # API routes
-    @app.route('/api/health')
-    def health_check():
-        return jsonify({'status': 'ok', 'message': 'Photobooth API is running'})
 
     return app
 
