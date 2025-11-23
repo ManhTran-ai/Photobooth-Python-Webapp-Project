@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Filter Selection - Photobooth{% endblock %}
+{% block content %}
+
+<div class="session-page">
+    <div class="session-container">
+        <!-- Header -->
+        <div class="session-header">
+            <h1>Choose Your Filter</h1>
+            <p>Select a filter to apply to all 4 photos</p>
+        </div>
+
+        <!-- Photos Grid -->
+        <div class="photos-grid-container">
+            <h2>Your Photos</h2>
+            <div class="photos-grid" id="photos-grid">
+                <!-- Photos will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Filter Selection Sidebar -->
+        <div class="filter-selection-container">
+            <div class="filter-categories">
+                <h3>Filter Categories</h3>
+                <div class="category-tabs">
+                    <button class="category-tab active" data-category="all">All</button>
+                    <button class="category-tab" data-category="basic">Basic</button>
+                    <button class="category-tab" data-category="artistic">Artistic</button>
+                    <button class="category-tab" data-category="instagram">Instagram</button>
+                    <button class="category-tab" data-category="effects">Effects</button>
+                </div>
+            </div>
+
+            <div class="filters-list" id="filters-list">
+                <!-- Filters will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Comparison Toggle -->
+        <div class="comparison-controls">
+            <button class="btn btn-secondary" id="toggle-comparison">
+                <i class="icon">🔄</i> Toggle Before/After
+            </button>
+            <button class="btn btn-primary" id="apply-filter-btn" style="display: none;">
+                <i class="icon">✓</i> Apply Filter
+            </button>
+            <a href="/gallery" class="btn btn-outline">
+                <i class="icon">📁</i> Go to Gallery
+            </a>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loading-overlay" style="display: none;">
+            <div class="loading-spinner"></div>
+            <p id="loading-text">Applying filter...</p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const SESSION_ID = '{{ session_id }}';
+</script>
+<script src="{{ url_for('static', filename='js/session.js') }}"></script>
+{% endblock %}
+

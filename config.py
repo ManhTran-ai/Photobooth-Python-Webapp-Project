@@ -20,6 +20,7 @@ class Config:
     ORIGINALS_FOLDER = os.path.join(UPLOAD_FOLDER, 'originals')
     PROCESSED_FOLDER = os.path.join(UPLOAD_FOLDER, 'processed')
     THUMBNAILS_FOLDER = os.path.join(UPLOAD_FOLDER, 'thumbnails')
+    COLLAGES_FOLDER = os.path.join(UPLOAD_FOLDER, 'collages')
 
 
 class DevelopmentConfig(Config):
