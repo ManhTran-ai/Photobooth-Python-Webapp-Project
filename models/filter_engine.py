@@ -155,9 +155,9 @@ class FilterEngine:
     def _apply_oil_painting(cv2_image):
         """Apply oil painting effect"""
         try:
-            # Try using xphoto module if available
-            import cv2.xphoto
-            oil = cv2.xphoto.oilPainting(cv2_image, 7, 1)
+            # Try using xphoto module if available without shadowing global cv2
+            from cv2 import xphoto as cv2_xphoto
+            oil = cv2_xphoto.oilPainting(cv2_image, 7, 1)
         except (AttributeError, ImportError):
             # Fallback to bilateral filter for oil painting effect
             oil = cv2.bilateralFilter(cv2_image, 5, 50, 50)
@@ -263,7 +263,7 @@ class FilterEngine:
     @staticmethod
     def get_available_filters():
         """Get list of all available filters with metadata"""
-        return [
+        filters = [
             {
                 'name': 'none',
                 'category': 'basic',
@@ -373,4 +373,9 @@ class FilterEngine:
                 'description': 'Orange/warm color cast'
             }
         ]
+
+        for item in filters:
+            item['example_thumbnail'] = f'filter_previews/{item["name"]}.jpg'
+
+        return filters
 

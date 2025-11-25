@@ -1094,41 +1094,107 @@ footer {
     opacity: 0.9;
 }
 
-.photos-grid-container {
+.session-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.8fr) minmax(320px, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.photos-panel {
     background: white;
     border-radius: 20px;
     padding: 2rem;
-    margin-bottom: 2rem;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
 
-.photos-grid-container h2 {
+.photos-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
     margin-bottom: 1.5rem;
     color: #333;
 }
 
+.photos-panel-header h2 {
+    margin-bottom: 0.25rem;
+}
+
+.photos-panel-header p {
+    margin: 0;
+    color: #777;
+}
+
+.comparison-toggle-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
 .session-page .photos-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.5rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
 }
 
 .photo-card {
     position: relative;
-    border-radius: 15px;
+    border-radius: 18px;
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+    background: #000;
+    aspect-ratio: 3 / 4;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    --comparison-percent: 50%;
 }
 
 .photo-card:hover {
-    transform: scale(1.05);
+    transform: translateY(-6px);
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.2);
 }
 
-.photo-image {
+.photo-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
-    height: auto;
+    height: 100%;
+}
+
+.photo-layer img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     display: block;
+}
+
+.photo-layer.photo-original {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.photo-filtered {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    transition: width 0.2s ease;
+}
+
+.photo-filtered img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.photo-card.comparison-enabled .photo-layer.photo-original {
+    opacity: 1;
+}
+
+.photo-card.comparison-enabled .photo-filtered {
+    width: var(--comparison-percent, 50%);
+    border-right: 2px solid rgba(255, 255, 255, 0.8);
 }
 
 .photo-label {
@@ -1136,10 +1202,35 @@ footer {
     bottom: 0;
     left: 0;
     right: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.85));
     color: white;
-    padding: 0.5rem;
+    padding: 1rem;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.comparison-slider-wrapper {
+    display: none;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.comparison-slider-wrapper.active {
+    display: flex;
+}
+
+.comparison-slider-wrapper input[type="range"] {
+    width: 220px;
+    accent-color: #764ba2;
+}
+
+.comparison-hint {
+    margin-top: 0.75rem;
     text-align: center;
+    color: #764ba2;
     font-weight: 600;
 }
 
@@ -1147,8 +1238,9 @@ footer {
     background: white;
     border-radius: 20px;
     padding: 2rem;
-    margin-bottom: 2rem;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    position: sticky;
+    top: 30px;
 }
 
 .filter-selection-container h3 {
@@ -1200,6 +1292,9 @@ footer {
     cursor: pointer;
     transition: all 0.3s ease;
     border: 2px solid transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .filter-card:hover {
@@ -1210,7 +1305,7 @@ footer {
 
 .filter-card.active {
     border-color: #667eea;
-    background: rgba(102, 126, 234, 0.1);
+    background: rgba(102, 126, 234, 0.08);
 }
 
 .filter-preview {
@@ -1218,29 +1313,34 @@ footer {
     aspect-ratio: 1;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border-radius: 10px;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
 }
 
-.filter-card.active .filter-preview {
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+.filter-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.filter-card:not(.active) .filter-preview img {
+    filter: saturate(0.9);
 }
 
 .filter-name {
     font-weight: 600;
     color: #333;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.1rem;
     font-size: 0.9rem;
 }
 
 .filter-description {
     font-size: 0.75rem;
     color: #666;
+    min-height: 30px;
 }
 
 .comparison-controls {
@@ -1263,4 +1363,28 @@ footer {
 .filters-list::-webkit-scrollbar-thumb {
     background: #667eea;
     border-radius: 10px;
+}
+
+@media (max-width: 1100px) {
+    .session-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .filter-selection-container {
+        position: static;
+    }
+
+    .comparison-toggle-group {
+        align-items: flex-start;
+    }
+
+    .comparison-slider-wrapper input[type="range"] {
+        width: 180px;
+    }
+}
+
+@media (max-width: 768px) {
+    .session-page .photos-grid {
+        grid-template-columns: 1fr;
+    }
 }

@@ -1,7 +1,7 @@
 """
 API routes for photobooth application
 """
-from flask import Blueprint, request, jsonify, send_from_directory, current_app
+from flask import Blueprint, request, jsonify, send_from_directory, current_app, url_for
 from werkzeug.utils import secure_filename
 from models.image_processor import ImageProcessor
 from models.filter_engine import FilterEngine
@@ -261,9 +261,25 @@ def get_filters():
     """Get list of available filters"""
     try:
         filters = FilterEngine.get_available_filters()
+        enriched_filters = []
+
+        for item in filters:
+            example_path = item.get('example_thumbnail')
+            example_url = None
+
+            if example_path:
+                absolute_path = os.path.join(current_app.static_folder, example_path)
+                if os.path.exists(absolute_path):
+                    example_url = url_for('static', filename=example_path)
+
+            enriched_filters.append({
+                **item,
+                'example_thumbnail': example_url
+            })
+
         return jsonify({
             'success': True,
-            'filters': filters
+            'filters': enriched_filters
         })
     except Exception as e:
         return jsonify({'error': f'Failed to get filters: {str(e)}'}), 500
@@ -272,35 +288,54 @@ def get_filters():
 @api_bp.route('/apply-filter', methods=['POST'])
 def apply_filter():
     """
-    Apply a filter to all photos in a session
+    Apply a filter to photos in a session
     Expects JSON with:
     - session_id: string (UUID)
     - filter_name: string
+    - photo_ids: list[int] (optional, defaults to all session photos)
+    - commit: bool (optional, defaults to False). When True, persist results.
     """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         session_id = data.get('session_id')
         filter_name = data.get('filter_name')
+        photo_ids = data.get('photo_ids')
+        commit = data.get('commit', False)
         
         if not session_id or not filter_name:
             return jsonify({'error': 'Missing session_id or filter_name'}), 400
+        
+        available_filters = {f['name'] for f in FilterEngine.get_available_filters()}
+        if filter_name not in available_filters:
+            return jsonify({'error': 'Invalid filter specified'}), 400
+        
+        if photo_ids is not None:
+            if not isinstance(photo_ids, list):
+                return jsonify({'error': 'photo_ids must be a list of integers'}), 400
+            try:
+                photo_ids = [int(pid) for pid in photo_ids]
+            except (TypeError, ValueError):
+                return jsonify({'error': 'photo_ids must be a list of integers'}), 400
         
         # Verify session exists
         session = Session.query.get(session_id)
         if not session:
             return jsonify({'error': 'Session not found'}), 404
         
-        # Get all photos for the session
-        photos = Photo.query.filter_by(session_id=session_id).order_by(Photo.photo_number).all()
+        # Determine photos to process
+        photo_query = Photo.query.filter_by(session_id=session_id)
+        if photo_ids:
+            photo_query = photo_query.filter(Photo.id.in_(photo_ids))
+        
+        photos = photo_query.order_by(Photo.photo_number).all()
         
         if not photos:
-            return jsonify({'error': 'No photos found in session'}), 404
+            return jsonify({'error': 'No photos found for processing'}), 404
         
         processed_images = []
+        thumbnails = []
         
-        # Apply filter to each photo
         for photo in photos:
-            # Load original image
             original_path = os.path.join(
                 current_app.config['ORIGINALS_FOLDER'],
                 photo.original_filename
@@ -309,62 +344,61 @@ def apply_filter():
             if not os.path.exists(original_path):
                 continue
             
-            # Load image
-            image = Image.open(original_path)
+            with Image.open(original_path) as image:
+                filtered_image = FilterEngine.apply_filter(image.copy(), filter_name)
             
-            # Apply filter
-            filtered_image = FilterEngine.apply_filter(image, filter_name)
-            
-            # Generate new filename for processed version
-            name_parts = photo.original_filename.rsplit('.', 1)
-            processed_filename = f"{name_parts[0]}_{filter_name}.jpg"
-            
-            # Save processed image
+            name_root, ext = photo.original_filename.rsplit('.', 1)
+            processed_filename = f"{name_root}_{filter_name}.jpg"
             processed_path = os.path.join(
                 current_app.config['PROCESSED_FOLDER'],
                 processed_filename
             )
             ImageProcessor.save_image(filtered_image, processed_path)
             
-            # Create and save thumbnail
             thumbnail_image = ImageProcessor.create_thumbnail(filtered_image.copy())
-            thumbnail_filename = f"{name_parts[0]}_{filter_name}.jpg"
+            thumbnail_filename = f"{name_root}_{filter_name}.jpg"
             thumbnail_path = os.path.join(
                 current_app.config['THUMBNAILS_FOLDER'],
                 thumbnail_filename
             )
             ImageProcessor.save_image(thumbnail_image, thumbnail_path)
             
-            # Update photo record
-            photo.processed_filename = processed_filename
-            photo.thumbnail_filename = thumbnail_filename
-            photo.applied_filter = filter_name
+            processed_url = url_for('api.serve_image', folder='processed', filename=processed_filename)
+            thumbnail_url = url_for('api.serve_image', folder='thumbnails', filename=thumbnail_filename)
+            original_url = url_for('api.serve_image', folder='originals', filename=photo.original_filename)
             
             processed_images.append({
                 'photo_id': photo.id,
                 'photo_number': photo.photo_number,
-                'original_url': f'/api/images/originals/{photo.original_filename}',
-                'processed_url': f'/api/images/processed/{processed_filename}',
-                'thumbnail_url': f'/api/images/thumbnails/{thumbnail_filename}'
+                'original_url': original_url,
+                'processed_url': processed_url,
+                'thumbnail_url': thumbnail_url
             })
+            thumbnails.append(thumbnail_url)
+            
+            if commit:
+                photo.processed_filename = processed_filename
+                photo.thumbnail_filename = thumbnail_filename
+                photo.applied_filter = filter_name
         
-        # Record filter application
-        filter_applied = FilterApplied(
-            session_id=session_id,
-            filter_name=filter_name
-        )
-        db.session.add(filter_applied)
-        
-        # Update session status
-        session.status = 'completed'
-        session.completed_at = datetime.utcnow()
-        
-        db.session.commit()
+        if commit:
+            filter_applied = FilterApplied(
+                session_id=session_id,
+                filter_name=filter_name
+            )
+            db.session.add(filter_applied)
+            session.status = 'completed'
+            session.completed_at = datetime.utcnow()
+            db.session.commit()
+        else:
+            db.session.expire_all()
         
         return jsonify({
             'success': True,
             'processed_images': processed_images,
-            'filter_name': filter_name
+            'thumbnails': thumbnails,
+            'filter_name': filter_name,
+            'committed': commit
         })
         
     except Exception as e:

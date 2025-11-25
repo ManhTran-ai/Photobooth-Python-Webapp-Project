@@ -4,44 +4,58 @@
 
 <div class="session-page">
     <div class="session-container">
-        <!-- Header -->
         <div class="session-header">
             <h1>Choose Your Filter</h1>
             <p>Select a filter to apply to all 4 photos</p>
         </div>
 
-        <!-- Photos Grid -->
-        <div class="photos-grid-container">
-            <h2>Your Photos</h2>
-            <div class="photos-grid" id="photos-grid">
-                <!-- Photos will be loaded here -->
-            </div>
-        </div>
-
-        <!-- Filter Selection Sidebar -->
-        <div class="filter-selection-container">
-            <div class="filter-categories">
-                <h3>Filter Categories</h3>
-                <div class="category-tabs">
-                    <button class="category-tab active" data-category="all">All</button>
-                    <button class="category-tab" data-category="basic">Basic</button>
-                    <button class="category-tab" data-category="artistic">Artistic</button>
-                    <button class="category-tab" data-category="instagram">Instagram</button>
-                    <button class="category-tab" data-category="effects">Effects</button>
+        <div class="session-layout">
+            <section class="photos-panel">
+                <div class="photos-panel-header">
+                    <div>
+                        <h2>Your Photos</h2>
+                        <p>Preview updates instantly across all 4 shots</p>
+                    </div>
+                    <div class="comparison-toggle-group">
+                        <button class="btn btn-secondary" id="toggle-comparison">
+                            <i class="icon">🔄</i> Toggle Before/After
+                        </button>
+                        <div class="comparison-slider-wrapper" id="comparison-slider-wrapper">
+                            <label for="comparison-slider">Comparison Slider</label>
+                            <input type="range" min="0" max="100" value="50" id="comparison-slider">
+                            <span id="comparison-value">50%</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="filters-list" id="filters-list">
-                <!-- Filters will be loaded here -->
-            </div>
+                <div class="photos-grid" id="photos-grid">
+                    <!-- Photos injected via session.js -->
+                </div>
+                <p class="comparison-hint" id="comparison-hint" style="display: none;">
+                    Drag the slider to reveal original (left) vs filtered (right).
+                </p>
+            </section>
+
+            <aside class="filter-selection-container">
+                <div class="filter-categories">
+                    <h3>Filter Categories</h3>
+                    <div class="category-tabs" id="filter-categories">
+                        <button class="category-tab active" data-category="all">All</button>
+                        <button class="category-tab" data-category="basic">Basic</button>
+                        <button class="category-tab" data-category="artistic">Artistic</button>
+                        <button class="category-tab" data-category="instagram">Instagram</button>
+                        <button class="category-tab" data-category="effects">Effects</button>
+                    </div>
+                </div>
+
+                <div class="filters-list" id="filters-list">
+                    <!-- Filters injected via session.js -->
+                </div>
+            </aside>
         </div>
 
-        <!-- Comparison Toggle -->
         <div class="comparison-controls">
-            <button class="btn btn-secondary" id="toggle-comparison">
-                <i class="icon">🔄</i> Toggle Before/After
-            </button>
-            <button class="btn btn-primary" id="apply-filter-btn" style="display: none;">
+            <button class="btn btn-primary" id="apply-filter-btn" disabled>
                 <i class="icon">✓</i> Apply Filter
             </button>
             <a href="/gallery" class="btn btn-outline">
@@ -49,7 +63,6 @@
             </a>
         </div>
 
-        <!-- Loading Overlay -->
         <div class="loading-overlay" id="loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
             <p id="loading-text">Applying filter...</p>
