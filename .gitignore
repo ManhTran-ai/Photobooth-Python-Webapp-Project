@@ -205,3 +205,38 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment variables
+.env
+.env.local
+
+# Database
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads
+static/uploads/originals/*
+static/uploads/processed/*
+static/uploads/thumbnails/*
+static/uploads/collages/*
+
+# Keep folder structure but ignore contents
+!static/uploads/originals/.gitkeep
+!static/uploads/processed/.gitkeep
+!static/uploads/thumbnails/.gitkeep
+!static/uploads/collages/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
