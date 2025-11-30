@@ -1,99 +1,155 @@
-{% extends "base.html" %} {% block title %}Trang Chủ - Photobooth{% endblock %}
+{% extends "base.html" %}
+{% block title %}Home - Photobooth{% endblock %}
 {% block content %}
+
 <!-- Hero Section -->
 <section class="hero">
-  <div class="hero-content">
-    <h1 class="hero-title">📸 Photobooth Studio</h1>
-    <p class="hero-subtitle">Chụp ảnh đẹp và áp dụng bộ lọc tuyệt vời</p>
-    <div class="hero-buttons">
-      <button id="start-camera" class="btn btn-primary">
-        <i class="icon">📷</i>
-        Bắt đầu chụp ảnh
-      </button>
-      <a href="/gallery" class="btn btn-secondary">
-        <i class="icon">🖼️</i>
-        Xem thư viện
-      </a>
+    <div class="hero-content">
+        <h1 class="hero-title">📸 Photobooth Studio</h1>
+        <p class="hero-subtitle">Create stunning photos with professional filters in a fun 4-photo session!</p>
+        <div class="hero-buttons">
+            <a href="/capture" class="btn btn-primary">
+                <i class="icon">🎯</i>
+                Start New Session
+            </a>
+            <a href="/gallery" class="btn btn-secondary">
+                <i class="icon">📁</i>
+                Upload Existing Photos
+            </a>
+        </div>
     </div>
-  </div>
 </section>
 
-<!-- Camera Section -->
-<section class="camera-section" id="camera-section" style="display: none">
-  <div class="camera-container">
-    <div class="camera-wrapper">
-      <video id="video" autoplay muted playsinline></video>
-      <canvas id="canvas" style="display: none"></canvas>
-
-      <!-- Camera Controls -->
-      <div class="camera-controls">
-        <button id="capture" class="btn btn-capture">
-          <i class="icon">📸</i>
-          Chụp ảnh
-        </button>
-        <button id="toggle-camera" class="btn btn-toggle">
-          <i class="icon">🔄</i>
-          Đổi camera
-        </button>
-        <button id="close-camera" class="btn btn-close">
-          <i class="icon">❌</i>
-          Đóng
-        </button>
-      </div>
-
-      <!-- Filter Preview -->
-      <div class="filter-preview">
-        <h3>Bộ lọc có sẵn:</h3>
-        <div class="filter-buttons">
-          <button class="filter-btn active" data-filter="none">Gốc</button>
-          <button class="filter-btn" data-filter="sepia">Sepia</button>
-          <button class="filter-btn" data-filter="grayscale">Đen trắng</button>
-          <button class="filter-btn" data-filter="vintage">Vintage</button>
-          <button class="filter-btn" data-filter="bright">Sáng</button>
-          <button class="filter-btn" data-filter="contrast">Tương phản</button>
+<!-- 3-Step Instructions -->
+<section class="instructions">
+    <div class="container">
+        <h2 class="section-title">How It Works</h2>
+        <div class="steps-grid">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <div class="step-icon">📷</div>
+                <h3>Capture</h3>
+                <p>Take 4 photos in a guided sequence with countdown timer</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <div class="step-icon">🎨</div>
+                <h3>Filter</h3>
+                <p>Choose from 15+ professional filters to apply to your photos</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <div class="step-icon">⬇️</div>
+                <h3>Download</h3>
+                <p>Save and share your beautifully filtered photos</p>
+            </div>
         </div>
-      </div>
     </div>
-  </div>
+</section>
+
+<!-- Filter Examples Carousel -->
+<section class="filter-examples">
+    <div class="container">
+        <h2 class="section-title">Explore Our Filters</h2>
+        <div class="filter-carousel">
+            <div class="carousel-wrapper">
+                <div class="filter-examples-grid" id="filter-examples">
+                    <!-- Filter preview cards will be loaded here -->
+                    <div class="filter-example-card">
+                        <div class="filter-preview-img" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <span class="filter-label">Grayscale</span>
+                        </div>
+                        <p class="filter-name">Black & White</p>
+                    </div>
+                    <div class="filter-example-card">
+                        <div class="filter-preview-img" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                            <span class="filter-label">Sepia</span>
+                        </div>
+                        <p class="filter-name">Vintage Sepia</p>
+                    </div>
+                    <div class="filter-example-card">
+                        <div class="filter-preview-img" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                            <span class="filter-label">Cartoon</span>
+                        </div>
+                        <p class="filter-name">Cartoon Style</p>
+                    </div>
+                    <div class="filter-example-card">
+                        <div class="filter-preview-img" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                            <span class="filter-label">Vintage</span>
+                        </div>
+                        <p class="filter-name">Vintage</p>
+                    </div>
+                    <div class="filter-example-card">
+                        <div class="filter-preview-img" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">
+                            <span class="filter-label">Nashville</span>
+                        </div>
+                        <p class="filter-name">Instagram Nashville</p>
+                    </div>
+                    <div class="filter-example-card">
+                        <div class="filter-preview-img" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">
+                            <span class="filter-label">Valencia</span>
+                        </div>
+                        <p class="filter-name">Instagram Valencia</p>
+                    </div>
+                    <div class="filter-example-card">
+                        <div class="filter-preview-img" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);">
+                            <span class="filter-label">X-Pro II</span>
+                        </div>
+                        <p class="filter-name">Instagram X-Pro II</p>
+                    </div>
+                    <div class="filter-example-card">
+                        <div class="filter-preview-img" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);">
+                            <span class="filter-label">Walden</span>
+                        </div>
+                        <p class="filter-name">Instagram Walden</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </section>
 
 <!-- Features Section -->
 <section class="features">
-  <div class="container">
-    <h2>Tính năng nổi bật</h2>
-    <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon">📷</div>
-        <h3>Chụp ảnh trực tiếp</h3>
-        <p>Chụp ảnh từ camera với chất lượng cao và độ phân giải tốt</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🎨</div>
-        <h3>Bộ lọc đa dạng</h3>
-        <p>Nhiều bộ lọc đẹp mắt để tạo ra những bức ảnh độc đáo</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">💾</div>
-        <h3>Lưu trữ an toàn</h3>
-        <p>Lưu trữ ảnh của bạn một cách an toàn và dễ dàng truy cập</p>
-      </div>
+    <div class="container">
+        <h2 class="section-title">Key Features</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🎨</div>
+                <h3>15+ Filters</h3>
+                <p>Professional filters including Basic, Artistic, Instagram-style, and Effects categories</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">👤</div>
+                <h3>Face Detection</h3>
+                <p>Automatic face detection with frame guides for perfect positioning</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🖼️</div>
+                <h3>Collage Maker</h3>
+                <p>Create beautiful collages from your 4-photo sessions</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Fast Processing</h3>
+                <p>Real-time filter preview and instant application</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>Responsive Design</h3>
+                <p>Works seamlessly on desktop, tablet, and mobile devices</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💾</div>
+                <h3>Safe Storage</h3>
+                <p>Your photos are securely stored and easily accessible</p>
+            </div>
+        </div>
     </div>
-  </div>
 </section>
 
-<!-- Recent Photos Preview -->
-<section class="recent-photos">
-  <div class="container">
-    <h2>Ảnh gần đây</h2>
-    <div class="photos-grid" id="recent-photos">
-      <!-- Photos will be loaded here via JavaScript -->
-    </div>
-    <div class="text-center">
-      <a href="/gallery" class="btn btn-outline">Xem tất cả ảnh</a>
-    </div>
-  </div>
-</section>
-{% endblock %} {% block scripts %}
-<script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+{% endblock %}
+
+{% block scripts %}
 <script src="{{ url_for('static', filename='js/home.js') }}"></script>
 {% endblock %}
