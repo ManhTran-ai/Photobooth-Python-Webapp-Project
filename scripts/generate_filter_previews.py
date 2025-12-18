@@ -2,6 +2,8 @@
 Utility script to (re)generate filter preview thumbnails used on the session page.
 """
 import os
+import random
+import numpy as np
 from PIL import Image, ImageDraw
 from models.filter_engine import FilterEngine
 
@@ -38,6 +40,10 @@ def build_base_image(width=320, height=240):
 
 
 def main():
+    # Deterministic overlays/noise so previews stay stable across runs
+    random.seed(42)
+    np.random.seed(42)
+
     preview_dir = os.path.join("static", "filter_previews")
     os.makedirs(preview_dir, exist_ok=True)
 
