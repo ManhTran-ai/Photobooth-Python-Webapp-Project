@@ -1,83 +1,97 @@
 {% extends "base.html" %}
-{% block title %}Capture - Photobooth{% endblock %}
+{% block title %}Chụp hình - Photobooth{% endblock %}
 {% block content %}
 
 <div class="capture-page">
-    <!-- Progress Indicator -->
-    <div class="capture-progress">
-        <div class="progress-bar">
-            <div class="progress-fill" id="progress-fill"></div>
-        </div>
-        <div class="progress-text" id="progress-text">Photo 0/4</div>
-    </div>
-
-    <!-- Camera Interface -->
     <div class="capture-container">
+        <!-- Top controls (delay, upload) -->
+        <div class="top-controls">
+            <div class="selectors">
+                <label class="selector">
+                    <select id="delay-select">
+                        <option value="0">Không đếm</option>
+                        <option value="3" selected>Trễ 3 giây</option>
+                        <option value="5">Trễ 5 giây</option>
+                    </select>
+                </label>
+            </div>
+            <div class="upload-action">
+                <a href="/upload" class="btn btn-outline" id="upload-btn">
+                    <i class="icon">📤</i> Tải lên ảnh
+                </a>
+            </div>
+        </div>
+
+        <div class="capture-layout">
+            <!-- Left QR / Info panel -->
+            <aside class="left-panel">
+                <div class="qr-card">
+                    <p class="qr-text">Tải ứng dụng để dùng vô vàn khung hình, sticker và công cụ làm đẹp!</p>
+                    <div class="qr-image-placeholder" aria-hidden="true">QR</div>
+                    <p class="qr-sub">Quét để tải xuống</p>
+                </div>
+            </aside>
+
+            <!-- Center: large video preview -->
+            <main class="center-panel">
+                <div class="video-wrapper">
+                    <video id="video" autoplay muted playsinline></video>
+                    <canvas id="canvas" style="display: none;"></canvas>
+                </div>
+
+                <div class="controls-row">
+                    <button class="btn btn-secondary" id="start-session-btn">Bắt đầu</button>
+                    <button class="btn btn-capture-large" id="capture-btn" style="display:none;">Chụp</button>
+                    <button class="btn btn-primary btn-continue" id="proceed-btn" style="display:none;margin-left:12px;">Tiếp</button>
+                    <!-- enable-camera-btn may be created dynamically by JS; include a placeholder for styling -->
+                    <button class="btn btn-outline" id="enable-camera-btn" style="display:none;margin-left:12px;">Bật camera</button>
+                </div>
+            </main>
+
+            <!-- Right: thumbnails -->
+            <aside class="right-panel">
+                <div class="thumb-list" id="thumb-list">
+                    <!-- thumbnails appended here -->
+                    <div class="thumb empty"></div>
+                    <div class="thumb empty"></div>
+                    <div class="thumb empty"></div>
+                    <div class="thumb empty"></div>
+                </div>
+            </aside>
+        </div>
+
         <!-- Countdown Overlay -->
         <div class="countdown-overlay" id="countdown-overlay" style="display: none;">
             <div class="countdown-content">
                 <div class="countdown-number" id="countdown-number">3</div>
-                <div class="countdown-label" id="countdown-label">Photo 1/4</div>
             </div>
         </div>
 
         <!-- Flash Effect -->
         <div class="flash-effect" id="flash-effect"></div>
 
-        <!-- Video Preview -->
-        <div class="video-wrapper">
-            <video id="video" autoplay muted playsinline></video>
-            <canvas id="canvas" style="display: none;"></canvas>
-            
-            <!-- Face Frame Guide -->
-            <div class="face-guide" id="face-guide">
-                <div class="guide-corner top-left"></div>
-                <div class="guide-corner top-right"></div>
-                <div class="guide-corner bottom-left"></div>
-                <div class="guide-corner bottom-right"></div>
+        <!-- Preview Modal (confirm / retake) -->
+        <div class="preview-modal" id="preview-modal" style="display: none;">
+            <div class="preview-content">
+                <h3 id="preview-title">Xem trước</h3>
+                <img id="preview-image" src="" alt="Preview">
+                <div class="preview-buttons">
+                    <button class="btn btn-primary" id="confirm-btn">Tiếp</button>
+                    <button class="btn btn-danger" id="retake-btn">Chụp lại</button>
+                </div>
             </div>
         </div>
 
-        <!-- Capture Controls -->
-        <div class="capture-controls">
-            <button class="btn btn-secondary" id="back-btn">
-                <i class="icon">←</i> Back
-            </button>
-            <button class="btn btn-capture-large" id="start-session-btn">
-                <i class="icon">📸</i> Start 4-Photo Session
-            </button>
-            <button class="btn btn-capture-large" id="capture-btn" style="display: none;">
-                <i class="icon">📸</i> Capture Photo
-            </button>
+        <!-- Loading & Error -->
+        <div class="loading-overlay" id="loading-overlay" style="display: none;">
+            <div class="loading-spinner"></div>
+            <p id="loading-text">Đang xử lý...</p>
         </div>
-    </div>
 
-    <!-- Photo Preview Modal -->
-    <div class="preview-modal" id="preview-modal" style="display: none;">
-        <div class="preview-content">
-            <h3 id="preview-title">Photo Preview</h3>
-            <img id="preview-image" src="" alt="Preview">
-            <div class="preview-buttons">
-                <button class="btn btn-success" id="confirm-btn">
-                    <i class="icon">✓</i> Looks Good
-                </button>
-                <button class="btn btn-danger" id="retake-btn">
-                    <i class="icon">✗</i> Retake
-                </button>
-            </div>
+        <div class="error-message" id="error-message" style="display: none;">
+            <p id="error-text"></p>
+            <button class="btn btn-primary" id="error-close">OK</button>
         </div>
-    </div>
-
-    <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loading-overlay" style="display: none;">
-        <div class="loading-spinner"></div>
-        <p id="loading-text">Processing...</p>
-    </div>
-
-    <!-- Error Message -->
-    <div class="error-message" id="error-message" style="display: none;">
-        <p id="error-text"></p>
-        <button class="btn btn-primary" id="error-close">OK</button>
     </div>
 </div>
 

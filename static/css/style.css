@@ -815,6 +815,257 @@ footer {
     position: relative;
 }
 
+/* New layout for landing/capture page: left QR, center preview, right thumbnails */
+.capture-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr 180px;
+    gap: 24px;
+    align-items: start;
+}
+
+.left-panel .qr-card {
+    background: linear-gradient(180deg, #ffeef4, #ffdfe9);
+    border-radius: 18px;
+    padding: 18px;
+    text-align: center;
+    color: #d6457b;
+    box-shadow: 0 10px 30px rgba(216, 63, 120, 0.08);
+}
+.left-panel .qr-text {
+    font-weight: 700;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+}
+.left-panel .qr-image {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    background: white;
+    padding: 8px;
+    border-radius: 12px;
+    margin: 8px auto;
+}
+.left-panel .qr-image-placeholder {
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 8px auto;
+    background: linear-gradient(180deg,#fff 0%, #f7f7f9 100%);
+    border-radius: 12px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+    color: #d6457b;
+    font-weight: 800;
+    font-size: 1.1rem;
+}
+
+/* Session page specific */
+.session-page .photos-panel {
+    display: block;
+}
+
+.session-page #frame-wrapper {
+    width: 420px;
+    margin: 0 auto;
+}
+
+#frame-wrapper svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Make 2x2 template scale nicely in the same wrapper */
+.control-tab.active { box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+
+@media (max-width: 900px) {
+    .session-page #frame-wrapper { width: 320px; }
+}
+
+.deco-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    padding: 4px;
+    cursor: pointer;
+}
+
+.filters-list .filter-btn {
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid #eee;
+    background: #fff;
+    cursor: pointer;
+    margin: 4px;
+    font-weight: 600;
+}
+
+.filters-list .filter-btn:disabled {
+    opacity: 0.6;
+}
+
+/* sticker button wrapper */
+.sticker-btn {
+    width: 56px;
+    height: 56px;
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid rgba(0,0,0,0.04);
+    background: rgba(255,255,255,0.98);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+}
+.sticker-btn img {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    border-radius: 8px;
+    display: none; /* hide any <img> fallback to avoid broken-image icon */
+}
+.sticker-btn:active, .sticker-btn:focus {
+    transform: translateY(1px);
+    outline: none;
+}
+
+/* sticker button look like rounded pink square with centered icon */
+.icons-list { display:flex; flex-wrap:wrap; gap:14px; }
+.sticker-btn {
+    background: rgba(255, 241, 246, 0.8);
+    border: 2px solid rgba(0,0,0,0.03);
+    padding: 10px;
+    width: 72px;
+    height: 72px;
+    border-radius: 14px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    transition: all 0.15s ease;
+}
+.sticker-btn {
+    /* ensure the sticker image is shown as a centered thumbnail */
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 44px 44px;
+}
+.sticker-btn img {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+.sticker-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+}
+.sticker-btn.active {
+    border: 3px solid #ff5c8a;
+    background: linear-gradient(180deg,#fff0f5,#ffeef4);
+    box-shadow: 0 10px 30px rgba(255,92,138,0.16);
+}
+.left-panel .qr-sub {
+    color: #7a2b45;
+    font-size: 0.85rem;
+    margin-top: 8px;
+}
+
+.right-panel .thumb-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    align-items: center;
+    padding-top: 18px;
+}
+.thumb {
+    width: 120px;
+    height: 90px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #5a1b12, #881a14);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    overflow: hidden;
+}
+.thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.thumb.empty {
+    opacity: 0.35;
+}
+
+.center-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.top-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.top-controls .selectors {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+.top-controls select {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(0,0,0,0.06);
+    font-weight: 600;
+}
+.top-controls .upload-action { }
+
+.controls-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+.filter-pills {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+.btn-continue {
+    background: linear-gradient(90deg, #ff7aa2, #ff5c8a);
+    color: white;
+    padding: 16px 48px;
+    border-radius: 40px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    box-shadow: 0 12px 30px rgba(255,92,138,0.18);
+    border: none;
+}
+.continue-row {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-top: 18px;
+}
+
+/* Small responsive tweaks */
+@media (max-width: 1000px) {
+    .capture-layout {
+        grid-template-columns: 1fr;
+    }
+    .right-panel, .left-panel { display: none; }
+    .video-wrapper { max-width: 100%; min-height: 320px; }
+}
+
 .video-wrapper {
     position: relative;
     width: 100%;
@@ -1094,6 +1345,14 @@ footer {
     opacity: 0.9;
 }
 
+.session-page h4,
+.session-page .control-label {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #333;
+    margin: 0 0 8px;
+}
+
 .session-layout {
     display: grid;
     grid-template-columns: minmax(0, 1.8fr) minmax(320px, 1fr);
@@ -1243,6 +1502,96 @@ footer {
     top: 30px;
 }
 
+/* Collage preview and controls styling */
+#collage-preview-wrapper {
+    border: 1px solid #f1f5f9;
+    padding: 10px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(16,24,40,0.06);
+    display: inline-block;
+    border-radius: 8px;
+}
+
+#collage-svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    background: white;
+    border-radius: 6px;
+}
+
+.template-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px dashed #eef2f7;
+}
+
+.template-thumb {
+    width: 110px;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .12s ease;
+    object-fit: cover;
+}
+.template-thumb:hover { transform: translateY(-4px); box-shadow: 0 10px 30px rgba(15,23,42,0.08); }
+
+.icons-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.deco-thumb {
+    width: 48px;
+    height: 48px;
+    padding: 6px;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(15,23,42,0.04);
+    cursor: grab;
+}
+
+.deco-thumb:active { cursor: grabbing; transform: scale(0.98); }
+
+.template-actions { display:flex; gap:10px; margin-top:12px; }
+
+.svg-deco { cursor: move; user-select: none; touch-action: none; }
+
+/* Decoration toolbar styles */
+#deco-toolbar button {
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.06);
+    background: white;
+    cursor: pointer;
+}
+
+#deco-toolbar { display: none; align-items: center; }
+
+.control-tabs {
+    display:flex;
+    gap:8px;
+    margin-bottom:8px;
+}
+.control-tab {
+    padding:6px 10px;
+    border-radius:8px;
+    border:1px solid rgba(0,0,0,0.06);
+    background:#fafafa;
+    cursor:pointer;
+    font-weight:600;
+}
+.control-tab.active {
+    background: linear-gradient(90deg,#ff8fb3,#ff5c8a);
+    color:white;
+    border-color:transparent;
+    box-shadow:0 6px 18px rgba(255,92,138,0.18);
+}
+
 .filter-selection-container h3 {
     margin-bottom: 1rem;
     color: #333;
@@ -1387,4 +1736,65 @@ footer {
     .session-page .photos-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Mobile-first improvements for session page */
+@media (max-width: 900px) {
+    .session-container {
+        padding: 0 12px;
+    }
+    .session-header h1 { font-size: 2rem; }
+    .session-layout {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    /* make collage preview full-width and scale SVG responsively */
+    #collage-preview-wrapper {
+        display: block;
+        width: 100%;
+        box-shadow: none;
+        padding: 6px;
+    }
+    #collage-svg {
+        width: 100%;
+        height: auto;
+    }
+    /* control panel becomes a horizontal strip below preview */
+    .filter-selection-container {
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+    }
+    .template-list {
+        gap: 8px;
+        justify-content: flex-start;
+        overflow-x: auto;
+    }
+    .template-thumb {
+        width: 160px;
+        flex: 0 0 auto;
+    }
+    .icons-list {
+        gap: 6px;
+        justify-content: flex-start;
+        overflow-x: auto;
+    }
+    .deco-thumb { flex: 0 0 auto; width: 44px; height:44px; }
+    .control-tabs { justify-content: center; flex-wrap: wrap; }
+    .control-tab { padding: 8px 12px; font-size: 0.95rem; }
+    .template-actions { flex-direction: column; gap: 10px; }
+    .template-actions .btn { width: 100%; }
+    /* toolbar placement adjust */
+    #deco-toolbar { position: fixed; right: 12px; bottom: 12px; display:none; }
+}
+
+@media (max-width: 480px) {
+    .session-header h1 { font-size: 1.6rem; }
+    .session-header p { font-size: 0.95rem; }
+    #collage-svg { border-radius: 6px; }
+    .template-thumb { width: 140px; }
+    .control-tab { padding: 6px 8px; font-size: 0.9rem; }
+    .deco-thumb { width: 40px; height: 40px; padding:4px; }
+    .video-wrapper { max-width: 100%; border-radius: 8px; overflow: hidden; }
+    .template-list { padding-bottom: 6px; }
 }

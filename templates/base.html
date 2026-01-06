@@ -25,12 +25,10 @@
       href="{{ url_for('static', filename='css/style.css') }}"
     />
 
-    <!-- Preload critical resources -->
-    <link
-      rel="preload"
-      href="{{ url_for('static', filename='js/camera.js') }}"
-      as="script"
-    />
+    <!-- Preload capture script only on capture page -->
+    {% if request.endpoint == 'capture' %}
+    <link rel="preload" href="{{ url_for('static', filename='js/capture.js') }}" as="script" />
+    {% endif %}
 
     {% block extra_head %}{% endblock %}
   </head>

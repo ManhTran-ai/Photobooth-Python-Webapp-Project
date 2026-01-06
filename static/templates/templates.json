@@ -1,0 +1,147 @@
+{
+  "basic": {
+    "name": "Basic",
+    "asset": "templates/assets/Basic.png",
+    "preview": "templates/previews/basic_preview.png",
+    "layout": "4x1",
+    "size": [640, 1850],
+    "photo_size": [540, 400],
+    "positions": [[50, 40], [50, 480], [50, 920], [50, 1360]],
+    "slots": 4,
+    "supports_color_vars": ["bg", "accent", "border"],
+    "decorations": true
+  },
+  "bling_bling": {
+    "name": "Bling Bling",
+    "asset": "templates/assets/Bling bling.png",
+    "preview": "templates/previews/bling_bling_preview.png",
+    "layout": "4x1",
+    "size": [640, 1850],
+    "photo_size": [540, 400],
+    "positions": [[50, 40], [50, 480], [50, 920], [50, 1360]],
+    "slots": 4,
+    "supports_color_vars": ["accent"],
+    "decorations": true
+  },
+  "cloudy_dream": {
+    "name": "Cloudy Dream",
+    "asset": "templates/assets/Cloudy_Dream.png",
+    "preview": "templates/previews/cloudy_dream_preview.png",
+    "layout": "4x1",
+    "size": [640, 1850],
+    "photo_size": [540, 400],
+    "positions": [[50, 40], [50, 480], [50, 920], [50, 1360]],
+    "slots": 4,
+    "supports_color_vars": ["bg", "accent"],
+    "decorations": true
+  },
+  "cute_cat": {
+    "name": "Cute Cat",
+    "asset": "templates/assets/Cute cat.png",
+    "preview": "templates/previews/cute_cat_preview.png",
+    "layout": "4x1",
+    "size": [640, 1850],
+    "photo_size": [540, 400],
+    "positions": [[50, 40], [50, 480], [50, 920], [50, 1360]],
+    "slots": 4,
+    "supports_color_vars": ["accent"],
+    "decorations": true
+  },
+  "cute_rabbit": {
+    "name": "Cute Rabbit",
+    "asset": "templates/assets/Cute_Rabbit.png",
+    "preview": "templates/previews/cute_rabbit_preview.png",
+    "layout": "4x1",
+    "size": [640, 1850],
+    "photo_size": [540, 400],
+    "positions": [[50, 40], [50, 480], [50, 920], [50, 1360]],
+    "slots": 4,
+    "supports_color_vars": ["accent"],
+    "decorations": true
+  },
+  "lovely_day": {
+    "name": "Lovely Day",
+    "asset": "templates/assets/Lovely_Day - Sao chép.png",
+    "preview": "templates/previews/lovely_day_preview.png",
+    "layout": "4x1",
+    "size": [640, 1850],
+    "photo_size": [540, 400],
+    "positions": [[50, 40], [50, 480], [50, 920], [50, 1360]],
+    "slots": 4,
+    "supports_color_vars": ["bg", "accent"],
+    "decorations": true
+  },
+  "memmories": {
+    "name": "Memmories",
+    "asset": "templates/assets/Memmories.png",
+    "preview": "templates/previews/memmories_preview.png",
+    "layout": "4x1",
+    "size": [640, 1850],
+    "photo_size": [540, 400],
+    "positions": [[50, 40], [50, 480], [50, 920], [50, 1360]],
+    "slots": 4,
+    "supports_color_vars": ["bg"],
+    "decorations": true
+  },
+  "milk_strawberry": {
+    "name": "Milk Strawberry",
+    "asset": "templates/assets/Milk Strawberry.png",
+    "preview": "templates/previews/milk_strawberry_preview.png",
+    "layout": "4x1",
+    "size": [640, 1850],
+    "photo_size": [540, 400],
+    "positions": [[50, 40], [50, 480], [50, 920], [50, 1360]],
+    "slots": 4,
+    "supports_color_vars": ["bg", "accent"],
+    "decorations": true
+  },
+  "notebook": {
+    "name": "Notebook",
+    "asset": "templates/assets/Notebook - Sao chép.png",
+    "preview": "templates/previews/notebook_preview.png",
+    "layout": "4x1",
+    "size": [640, 1850],
+    "photo_size": [540, 400],
+    "positions": [[50, 40], [50, 480], [50, 920], [50, 1360]],
+    "slots": 4,
+    "supports_color_vars": ["accent", "border"],
+    "decorations": true
+  },
+  "retro_windows": {
+    "name": "Retro Windows",
+    "asset": "templates/assets/Retro_Windows - Sao chép.png",
+    "preview": "templates/previews/retro_windows_preview.png",
+    "layout": "4x1",
+    "size": [640, 1850],
+    "photo_size": [540, 400],
+    "positions": [[50, 40], [50, 480], [50, 920], [50, 1360]],
+    "slots": 4,
+    "supports_color_vars": ["bg", "accent"],
+    "decorations": true
+  },
+  "tamogochi_pet": {
+    "name": "Tamogochi Pet",
+    "asset": "templates/assets/Tamogochi_Pet.png",
+    "preview": "templates/previews/tamogochi_pet_preview.png",
+    "layout": "4x1",
+    "size": [640, 1850],
+    "photo_size": [540, 400],
+    "positions": [[50, 40], [50, 480], [50, 920], [50, 1360]],
+    "slots": 4,
+    "supports_color_vars": ["accent"],
+    "decorations": true
+  },
+  "tedy_bear": {
+    "name": "Tedy Bear",
+    "asset": "templates/assets/Tedy_Bear.png",
+    "preview": "templates/previews/tedy_bear_preview.png",
+    "layout": "4x1",
+    "size": [640, 1850],
+    "photo_size": [540, 400],
+    "positions": [[50, 40], [50, 480], [50, 920], [50, 1360]],
+    "slots": 4,
+    "supports_color_vars": ["bg", "accent"],
+    "decorations": true
+  }
+}
+
