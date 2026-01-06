@@ -88,6 +88,12 @@ class FilterEngine:
             result = FilterEngine._apply_cool_tone(image)
         elif filter_name == 'warm_tone':
             result = FilterEngine._apply_warm_tone(image)
+        elif filter_name == 'smart_beauty':
+            result = FilterEngine._apply_smart_beauty(image)
+        elif filter_name == 'face_glow':
+            result = FilterEngine._apply_face_glow(image)
+        elif filter_name == 'portrait_pro':
+            result = FilterEngine._apply_portrait_pro(image)
         else:
             result = image
         
@@ -482,6 +488,184 @@ class FilterEngine:
         img_array[:, :, 2] = np.clip(img_array[:, :, 2] * 0.9, 0, 255)  # Blue
         return Image.fromarray(img_array.astype('uint8'))
     
+    # ============== SMART BEAUTY FILTERS (Face Detection Based) ==============
+
+    @staticmethod
+    def _apply_smart_beauty(image):
+        """
+        Smart Beauty Filter - Chỉ làm mịn da vùng khuôn mặt
+
+        Algorithm:
+        1. Detect faces using DNN
+        2. Tạo mask mềm cho vùng mặt
+        3. Áp dụng bilateral filter chỉ cho vùng mặt
+        4. Blend với ảnh gốc để giữ chi tiết background
+
+        Ưu điểm so với soft_skin thông thường:
+        - Không làm mờ background
+        - Giữ được texture tóc, quần áo
+        - Tự nhiên hơn vì chỉ smooth vùng da
+        """
+        try:
+            from models.face_detector import get_detector
+            detector = get_detector()
+            faces = detector.detect_faces(image, confidence_threshold=0.4)
+
+            if not faces:
+                # Fallback to regular soft_skin if no face detected
+                return FilterEngine._apply_soft_skin(image)
+
+            # Convert to numpy for processing
+            img_array = np.array(image).astype(np.float32)
+            result = img_array.copy()
+
+            # Process each face
+            for face in faces:
+                # Get face mask
+                mask = detector.get_face_mask(image, face, feather=15)
+                mask_array = np.array(mask).astype(np.float32) / 255.0
+
+                # Expand mask to 3 channels
+                mask_3ch = np.stack([mask_array] * 3, axis=-1)
+
+                # Apply bilateral filter to entire image (will be masked)
+                cv_img = FilterEngine._pil_to_cv2(image)
+                smooth = cv2.bilateralFilter(cv_img, 9, 75, 75)
+                smooth = cv2.bilateralFilter(smooth, 9, 75, 75)
+                smooth_rgb = cv2.cvtColor(smooth, cv2.COLOR_BGR2RGB).astype(np.float32)
+
+                # Blend: result = original * (1-mask) + smooth * mask
+                result = result * (1 - mask_3ch) + smooth_rgb * mask_3ch
+
+            # Brightness boost
+            result = np.clip(result * 1.03, 0, 255).astype(np.uint8)
+            return Image.fromarray(result)
+
+        except Exception as e:
+            print(f"Smart beauty filter error: {e}")
+            return FilterEngine._apply_soft_skin(image)
+
+    @staticmethod
+    def _apply_face_glow(image):
+        """
+        Face Glow Filter - Thêm hiệu ứng glow mềm quanh khuôn mặt
+
+        Algorithm:
+        1. Detect faces
+        2. Tạo radial gradient glow từ tâm mặt
+        3. Screen blend glow với ảnh gốc
+        4. Tăng nhẹ saturation và brightness
+
+        Hiệu ứng: Khuôn mặt sáng lên, tạo cảm giác tươi tắn
+        """
+        try:
+            from models.face_detector import get_detector
+            detector = get_detector()
+            face = detector.detect_largest_face(image, confidence_threshold=0.4)
+
+            if not face:
+                return FilterEngine._apply_pastel_glow(image)
+
+            img_array = np.array(image).astype(np.float32)
+            h, w = img_array.shape[:2]
+
+            cx, cy = face['center']
+            face_w = face['bbox'][2]
+
+            # Create radial gradient from face center
+            y_coords, x_coords = np.ogrid[:h, :w]
+            dist = np.sqrt((x_coords - cx)**2 + (y_coords - cy)**2)
+
+            # Glow radius based on face size
+            glow_radius = face_w * 1.5
+
+            # Create soft falloff
+            glow = np.clip(1 - (dist / glow_radius), 0, 1)
+            glow = glow ** 0.5  # Softer falloff
+            glow = (glow * 40).astype(np.float32)  # Intensity
+
+            # Add glow to image
+            glow_3ch = np.stack([glow] * 3, axis=-1)
+            result = np.clip(img_array + glow_3ch, 0, 255)
+
+            # Enhance colors slightly
+            result_img = Image.fromarray(result.astype(np.uint8))
+            result_img = ImageEnhance.Color(result_img).enhance(1.08)
+            result_img = ImageEnhance.Brightness(result_img).enhance(1.02)
+
+            return result_img
+
+        except Exception as e:
+            print(f"Face glow filter error: {e}")
+            return FilterEngine._apply_pastel_glow(image)
+
+    @staticmethod
+    def _apply_portrait_pro(image):
+        """
+        Portrait Pro Filter - Kết hợp nhiều kỹ thuật chuyên nghiệp
+
+        Algorithm:
+        1. Smart skin smoothing (chỉ vùng mặt)
+        2. Eye brightening (tăng sáng vùng mắt)
+        3. Subtle face contouring
+        4. Overall color grading (warm portrait tone)
+
+        Đây là filter cao cấp nhất, tổng hợp nhiều kỹ thuật
+        """
+        try:
+            from models.face_detector import get_detector
+            detector = get_detector()
+            faces = detector.detect_faces(image, confidence_threshold=0.4)
+
+            if not faces:
+                # Fallback: warm tone + soft skin
+                img = FilterEngine._apply_soft_skin(image)
+                return FilterEngine._apply_warm_tone(img)
+
+            # Step 1: Smart skin smoothing
+            img_array = np.array(image).astype(np.float32)
+            cv_img = FilterEngine._pil_to_cv2(image)
+
+            # Apply bilateral filter
+            smooth = cv2.bilateralFilter(cv_img, 9, 60, 60)
+            smooth_rgb = cv2.cvtColor(smooth, cv2.COLOR_BGR2RGB).astype(np.float32)
+
+            # Create combined face mask
+            h, w = img_array.shape[:2]
+            combined_mask = np.zeros((h, w), dtype=np.float32)
+
+            for face in faces:
+                mask = detector.get_face_mask(image, face, feather=20)
+                mask_array = np.array(mask).astype(np.float32) / 255.0
+                combined_mask = np.maximum(combined_mask, mask_array)
+
+            mask_3ch = np.stack([combined_mask] * 3, axis=-1)
+
+            # Blend smooth skin
+            result = img_array * (1 - mask_3ch * 0.7) + smooth_rgb * (mask_3ch * 0.7)
+
+            # Step 2: Subtle warming for portrait look
+            # Increase warmth in midtones
+            result[:, :, 0] = np.clip(result[:, :, 0] * 1.03, 0, 255)  # Red +3%
+            result[:, :, 2] = np.clip(result[:, :, 2] * 0.97, 0, 255)  # Blue -3%
+
+            # Step 3: Contrast enhancement in face region
+            mean_brightness = np.mean(result * mask_3ch)
+            contrast_boost = result + (result - mean_brightness) * 0.1 * mask_3ch
+            result = np.clip(contrast_boost, 0, 255)
+
+            # Step 4: Final color grading
+            result_img = Image.fromarray(result.astype(np.uint8))
+            result_img = ImageEnhance.Color(result_img).enhance(1.05)
+            result_img = ImageEnhance.Brightness(result_img).enhance(1.02)
+
+            return result_img
+
+        except Exception as e:
+            print(f"Portrait pro filter error: {e}")
+            img = FilterEngine._apply_soft_skin(image)
+            return FilterEngine._apply_warm_tone(img)
+
     @staticmethod
     def get_available_filters():
         """Get list of all available filters with metadata"""
@@ -653,6 +837,25 @@ class FilterEngine:
                 'category': 'effects',
                 'display_name': 'Warm Tone',
                 'description': 'Orange/warm color cast'
+            },
+            # AI-Powered Face Detection Filters
+            {
+                'name': 'smart_beauty',
+                'category': 'ai_beauty',
+                'display_name': 'Smart Beauty',
+                'description': 'AI skin smoothing - chỉ làm mịn vùng mặt'
+            },
+            {
+                'name': 'face_glow',
+                'category': 'ai_beauty',
+                'display_name': 'Face Glow',
+                'description': 'AI glow effect - tạo ánh sáng mềm quanh mặt'
+            },
+            {
+                'name': 'portrait_pro',
+                'category': 'ai_beauty',
+                'display_name': 'Portrait Pro',
+                'description': 'AI portrait enhancement - làm đẹp chuyên nghiệp'
             }
         ]
 

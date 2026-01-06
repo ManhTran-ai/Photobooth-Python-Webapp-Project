@@ -295,5 +295,476 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('photos-grid')) {
         new FilterSelectionPage();
     }
+
+    // AI Beauty Buttons
+    initAIBeautyButtons();
+
+    // Auto Sticker Buttons
+    initAutoStickerButtons();
 });
+
+/**
+ * Initialize AI Beauty filter buttons
+ */
+function initAIBeautyButtons() {
+    const aiButtons = {
+        'ai-smart-beauty': 'smart_beauty',
+        'ai-face-glow': 'face_glow',
+        'ai-portrait-pro': 'portrait_pro'
+    };
+
+    Object.entries(aiButtons).forEach(([buttonId, filterName]) => {
+        const btn = document.getElementById(buttonId);
+        if (btn) {
+            btn.addEventListener('click', async () => {
+                await applyAIFilter(filterName, btn);
+            });
+        }
+    });
+}
+
+/**
+ * Apply AI filter to session photos
+ */
+async function applyAIFilter(filterName, button) {
+    const sessionId = getSessionId();
+    if (!sessionId) {
+        showNotification('Session không hợp lệ', 'error');
+        return;
+    }
+
+    // Visual feedback
+    const originalText = button.innerHTML;
+    button.innerHTML = '⏳ Đang xử lý...';
+    button.disabled = true;
+
+    try {
+        // Call API to apply filter
+        const response = await fetch(`/api/apply-filter`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                session_id: sessionId,
+                filter_name: filterName,
+                commit: false  // Preview mode
+            })
+        });
+
+        // Check if response is OK before parsing JSON
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API Error Response:', errorText);
+            throw new Error(`Server error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Refresh the preview
+            if (typeof refreshCollagePreview === 'function') {
+                refreshCollagePreview();
+            }
+
+            // Show success message
+            showNotification(`✨ Đã áp dụng filter ${getFilterDisplayName(filterName)}`, 'success');
+        } else {
+            throw new Error(data.error || 'Failed to apply filter');
+        }
+    } catch (error) {
+        console.error('AI Filter error:', error);
+        showNotification('❌ Lỗi khi áp dụng filter: ' + error.message, 'error');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+/**
+ * Initialize Auto Sticker buttons
+ */
+function initAutoStickerButtons() {
+    const stickerButtons = document.querySelectorAll('.btn-auto-sticker');
+
+    stickerButtons.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const stickerType = btn.dataset.type;
+            await autoPlaceSticker(stickerType, btn);
+        });
+    });
+}
+
+/**
+ * Auto place sticker based on face detection
+ */
+async function autoPlaceSticker(stickerType, button) {
+    const sessionId = getSessionId();
+    if (!sessionId) {
+        showNotification('Session không hợp lệ', 'error');
+        return;
+    }
+
+    // Visual feedback
+    const originalText = button.innerHTML;
+    button.innerHTML = '⏳...';
+    button.disabled = true;
+
+    try {
+        // First, get the photos in session
+        const photosResponse = await fetch(`/api/sessions/${sessionId}/photos`);
+
+        if (!photosResponse.ok) {
+            throw new Error(`Server error: ${photosResponse.status}`);
+        }
+
+        const photosData = await photosResponse.json();
+
+        if (!photosData.photos || photosData.photos.length === 0) {
+            throw new Error('Không có ảnh trong session');
+        }
+
+        // For each photo, detect face and get sticker positions
+        for (const photo of photosData.photos) {
+            const filename = photo.processed_filename || photo.original_filename;
+
+            const response = await fetch(`/api/sticker-positions?sticker_type=${stickerType}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    filename: filename
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.positions && data.positions.length > 0) {
+                // Add stickers to collage preview at detected positions
+                data.positions.forEach(pos => {
+                    if (typeof addStickerToCollage === 'function') {
+                        addStickerToCollage(stickerType, pos.x, pos.y, pos.scale);
+                    }
+                });
+            }
+        }
+
+        showNotification(`🎭 Đã thêm sticker ${stickerType} dựa trên face detection`, 'success');
+
+    } catch (error) {
+        console.error('Auto sticker error:', error);
+        showNotification('❌ Lỗi: ' + error.message, 'error');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+/**
+ * Get display name for filter
+ */
+function getFilterDisplayName(filterName) {
+    const names = {
+        'smart_beauty': 'Smart Beauty',
+        'face_glow': 'Face Glow',
+        'portrait_pro': 'Portrait Pro'
+    };
+    return names[filterName] || filterName;
+}
+
+/**
+ * Show notification toast
+ */
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 24px;
+        border-radius: 8px;
+        background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+        color: white;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 9999;
+        animation: slideIn 0.3s ease;
+    `;
+    notification.textContent = message;
+
+    document.body.appendChild(notification);
+
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+// Add CSS animation
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+    .effect-item {
+        width: 80px;
+        height: 80px;
+        border-radius: 8px;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        background: #fff;
+    }
+    .effect-item:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .effect-item.selected {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+    }
+    .effect-item img {
+        width: 100%;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 6px 6px 0 0;
+    }
+    .effect-item .effect-name {
+        font-size: 10px;
+        padding: 4px 2px;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: 100%;
+        color: #333;
+    }
+    .effect-cat-tab.active {
+        background: #667eea !important;
+        color: #fff !important;
+        border-color: #667eea !important;
+    }
+`;
+document.head.appendChild(style);
+
+
+// ============== EFFECT FILTERS MODULE (Using FilterEngine) ==============
+
+let availableEffects = [];
+let selectedEffect = 'none';
+let activeEffectCategory = 'all';
+
+/**
+ * Get SESSION_ID from script data tag or global variable
+ */
+function getSessionId() {
+    // Try global variable first
+    if (typeof SESSION_ID !== 'undefined' && SESSION_ID) {
+        return SESSION_ID;
+    }
+
+    // Try reading from script data tag
+    const dataElement = document.getElementById('session-data');
+    if (dataElement) {
+        try {
+            const data = JSON.parse(dataElement.textContent);
+            return data.session_id;
+        } catch (e) {
+            console.error('Failed to parse session data:', e);
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Initialize Effect Filters selection
+ * Load filters từ API /api/filters (sử dụng FilterEngine có sẵn)
+ */
+async function initEffectFilters() {
+    try {
+        // Load filters from API - sử dụng FilterEngine
+        const response = await fetch('/api/filters');
+
+        // Check if response is OK
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.filters) {
+            availableEffects = data.filters;
+            renderEffectOptions();
+            bindEffectEvents();
+        }
+    } catch (error) {
+        console.error('Failed to load effect filters:', error);
+    }
+}
+
+/**
+ * Render effect options in the grid
+ * Hiển thị các filter có sẵn từ FilterEngine với preview thumbnails
+ */
+function renderEffectOptions() {
+    const container = document.getElementById('effects-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    // Filter by category
+    let effects = availableEffects;
+    if (activeEffectCategory !== 'all') {
+        effects = availableEffects.filter(ef => ef.category === activeEffectCategory);
+    }
+
+    effects.forEach(effect => {
+        const item = document.createElement('div');
+        item.className = `effect-item ${selectedEffect === effect.name ? 'selected' : ''}`;
+        item.dataset.effect = effect.name;
+        item.title = effect.description;
+
+        // Sử dụng preview thumbnail từ FilterEngine
+        const previewUrl = `/static/filter_previews/${effect.name}.jpg`;
+
+        item.innerHTML = `
+            <img src="${previewUrl}" alt="${effect.display_name}" onerror="this.src='/static/filter_previews/none.jpg'">
+            <span class="effect-name">${effect.display_name}</span>
+        `;
+
+        container.appendChild(item);
+    });
+}
+
+/**
+ * Bind events for effect selection
+ */
+function bindEffectEvents() {
+    // Category tabs
+    document.querySelectorAll('.effect-cat-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.effect-cat-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            activeEffectCategory = tab.dataset.category;
+            renderEffectOptions();
+        });
+    });
+
+    // Effect items (use event delegation)
+    const container = document.getElementById('effects-list');
+    if (container) {
+        container.addEventListener('click', async (e) => {
+            const item = e.target.closest('.effect-item');
+            if (item) {
+                const effectName = item.dataset.effect;
+                await applyEffectToSession(effectName);
+
+                // Update selection UI
+                document.querySelectorAll('.effect-item').forEach(i => i.classList.remove('selected'));
+                item.classList.add('selected');
+                selectedEffect = effectName;
+            }
+        });
+    }
+}
+
+/**
+ * Apply effect filter to all photos in session
+ * Sử dụng API /api/sessions/{id}/apply-filter với FilterEngine
+ */
+async function applyEffectToSession(effectName) {
+    const sessionId = getSessionId();
+    if (!sessionId) {
+        showNotification('Session không hợp lệ', 'error');
+        return;
+    }
+
+    // Get display name for notification
+    const effect = availableEffects.find(e => e.name === effectName);
+    const displayName = effect ? effect.display_name : effectName;
+
+    // Show loading
+    showNotification(`🎨 Đang áp dụng hiệu ứng "${displayName}"...`, 'info');
+
+    try {
+        // Sử dụng API apply-filter có sẵn với FilterEngine
+        const response = await fetch(`/api/apply-filter`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                session_id: sessionId,
+                filter_name: effectName,
+                commit: false  // Preview mode - không lưu vĩnh viễn
+            })
+        });
+
+        // Check if response is OK before parsing JSON
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API Error Response:', errorText);
+            throw new Error(`Server error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Refresh the collage preview
+            if (typeof refreshCollagePreview === 'function') {
+                refreshCollagePreview();
+            }
+
+            // Update thumbnails if available
+            if (data.processed_images && data.processed_images.length > 0) {
+                updateEffectThumbnails(data.processed_images);
+            }
+
+            showNotification(`✅ Đã áp dụng hiệu ứng "${displayName}"`, 'success');
+        } else {
+            throw new Error(data.error || 'Failed to apply effect');
+        }
+    } catch (error) {
+        console.error('Effect apply error:', error);
+        showNotification('❌ Lỗi: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Update photo thumbnails with new URLs after applying effect
+ */
+function updateEffectThumbnails(processedImages) {
+    processedImages.forEach(img => {
+        // Try to update any thumbnail elements
+        const thumbElements = document.querySelectorAll(`[data-photo-number="${img.photo_number}"] img`);
+        thumbElements.forEach(el => {
+            el.src = img.thumbnail_url + '?t=' + Date.now(); // Cache bust
+        });
+
+        // Also update processed URL elements
+        const processedElements = document.querySelectorAll(`[data-photo-id="${img.photo_id}"] img`);
+        processedElements.forEach(el => {
+            el.src = img.processed_url + '?t=' + Date.now();
+        });
+    });
+}
+
+// Effect filters module disabled here (duplicates with 'Bộ lọc' UI)
+
 

@@ -15,16 +15,22 @@ class PhotoCapture {
         
         this.initializeElements();
         this.initializeEventListeners();
-        this.startCamera();
+        // Attempt to start camera immediately; if it fails we'll show a retry button
+        this.startCamera().catch((err) => {
+            // startCamera handles showing a helpful message; swallow here
+            console.warn('Initial camera start failed:', err);
+        });
     }
 
     initializeElements() {
         this.startBtn = document.getElementById('start-session-btn');
         this.captureBtn = document.getElementById('capture-btn');
+        this.proceedBtn = document.getElementById('proceed-btn');
         this.backBtn = document.getElementById('back-btn');
         this.countdownOverlay = document.getElementById('countdown-overlay');
         this.countdownNumber = document.getElementById('countdown-number');
         this.countdownLabel = document.getElementById('countdown-label');
+        this.delaySelect = document.getElementById('delay-select');
         this.flashEffect = document.getElementById('flash-effect');
         this.previewModal = document.getElementById('preview-modal');
         this.previewImage = document.getElementById('preview-image');
@@ -38,25 +44,76 @@ class PhotoCapture {
         this.errorMessage = document.getElementById('error-message');
         this.errorText = document.getElementById('error-text');
         this.errorClose = document.getElementById('error-close');
+        this.enableCameraBtn = document.getElementById('enable-camera-btn');
+        this.thumbList = document.getElementById('thumb-list');
     }
 
     initializeEventListeners() {
-        this.startBtn.addEventListener('click', () => this.startSession());
-        this.captureBtn.addEventListener('click', () => this.capturePhoto());
-        this.backBtn.addEventListener('click', () => window.location.href = '/');
-        this.confirmBtn.addEventListener('click', () => this.confirmPhoto());
-        this.retakeBtn.addEventListener('click', () => this.retakePhoto());
-        this.errorClose.addEventListener('click', () => this.hideError());
+        if (this.startBtn) {
+            this.startBtn.addEventListener('click', () => this.startSession());
+        }
+
+        if (this.captureBtn) {
+            this.captureBtn.addEventListener('click', () => this.capturePhoto());
+        }
+
+        if (this.backBtn) {
+            this.backBtn.addEventListener('click', () => window.location.href = '/');
+        }
+
+        if (this.confirmBtn) {
+            this.confirmBtn.addEventListener('click', () => this.confirmPhoto());
+        }
+
+        if (this.retakeBtn) {
+            this.retakeBtn.addEventListener('click', () => this.retakePhoto());
+        }
+
+        if (this.errorClose) {
+            this.errorClose.addEventListener('click', () => this.hideError());
+        }
+
+        if (this.enableCameraBtn) {
+            this.enableCameraBtn.addEventListener('click', () => {
+                // user gesture to retry camera access
+                this.startCamera().catch((err) => {
+                    console.warn('Retry camera failed:', err);
+                });
+            });
+        }
+        if (this.proceedBtn) {
+            this.proceedBtn.addEventListener('click', () => {
+                // proceed to next page (session filters) only if session created
+                if (this.sessionId) {
+                    window.location.href = `/session/${this.sessionId}`;
+                } else {
+                    this.showError('Chưa có session. Vui lòng chụp ảnh trước.');
+                }
+            });
+        }
     }
 
     async startCamera() {
+        // Check support and secure context
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            this.handleCameraError(new Error('Camera API not supported on this browser.'));
+            throw new Error('Camera API not supported');
+        }
+
+        if (!window.isSecureContext) {
+            // getUserMedia is blocked on insecure origins; inform the user
+            this.handleCameraError(new Error('Insecure context'));
+            throw new Error('Insecure context for camera');
+        }
+
         try {
             const constraints = {
                 video: {
                     facingMode: 'user',
                     width: { ideal: 1280 },
                     height: { ideal: 720 }
-                }
+                },
+                audio: false
             };
 
             this.stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -67,41 +124,112 @@ class PhotoCapture {
                 this.canvas.height = this.video.videoHeight;
                 // Mirror video for front camera
                 this.video.style.transform = 'scaleX(-1)';
-                
                 // Adjust video wrapper aspect ratio to match video stream
                 this.adjustVideoWrapperAspectRatio();
             };
+
+            // Hide any previous camera error
+            this.hideError();
+            return;
         } catch (error) {
-            console.error('Camera error:', error);
-            this.showError('Could not access camera. Please check permissions and try again.');
+            this.handleCameraError(error);
+            throw error;
+        }
+    }
+
+    handleCameraError(error) {
+        console.error('Camera error handler:', error);
+        // Friendly messages for common cases
+        const name = error && error.name ? error.name : '';
+        if (error.message && error.message.includes('Insecure context')) {
+            this.showError('Trình duyệt chặn truy cập camera vì trang không an toàn. Vui lòng dùng HTTPS hoặc truy cập từ `localhost`.');
+            this.showEnableCameraButton(true);
+            return;
+        }
+
+        switch (name) {
+            case 'NotAllowedError':
+            case 'PermissionDeniedError':
+                this.showError('Quyền truy cập camera bị từ chối. Vui lòng cho phép camera trong trình duyệt và thử lại.');
+                break;
+            case 'NotFoundError':
+            case 'DevicesNotFoundError':
+                this.showError('Không tìm thấy camera trên thiết bị này.');
+                break;
+            case 'NotReadableError':
+            case 'TrackStartError':
+                this.showError('Không thể mở camera — có thể đang được sử dụng bởi ứng dụng khác.');
+                break;
+            default:
+                this.showError('Không thể truy cập camera. Vui lòng kiểm tra quyền/thiết bị và thử lại.');
+                break;
+        }
+
+        // Show retry button so user can trigger a gesture to re-request permission
+        this.showEnableCameraButton(true);
+    }
+
+    showEnableCameraButton(visible = true) {
+        if (!this.enableCameraBtn) {
+            // try to create a small retry button near controls
+            const controlsRow = document.querySelector('.controls-row') || document.querySelector('.top-controls');
+            if (controlsRow) {
+                const btn = document.createElement('button');
+                btn.id = 'enable-camera-btn';
+                btn.className = 'btn btn-outline';
+                btn.textContent = 'Bật camera';
+                btn.style.marginLeft = '8px';
+                controlsRow.appendChild(btn);
+                this.enableCameraBtn = btn;
+                this.enableCameraBtn.addEventListener('click', () => {
+                    this.startCamera().catch((err) => {
+                        console.warn('Retry camera failed:', err);
+                    });
+                });
+            }
+        } else {
+            this.enableCameraBtn.style.display = visible ? 'inline-flex' : 'none';
         }
     }
 
     async startSession() {
         // Create new session
         try {
+            console.log('Creating session...');
             const response = await fetch('/api/sessions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
 
-            if (!response.ok) throw new Error('Failed to create session');
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (parseErr) {
+                console.warn('Failed to parse session response as JSON', parseErr);
+            }
 
-            const data = await response.json();
+            if (!response.ok) {
+                const serverMessage = (data && (data.error || data.message)) ? (data.error || data.message) : `HTTP ${response.status}`;
+                throw new Error(`Failed to create session: ${serverMessage}`);
+            }
+
+            console.log('Session created', data);
             this.sessionId = data.session_id;
             this.currentPhoto = 0;
             this.capturedPhotos = [];
             this.isCapturing = true;
 
-            // Hide start button, show capture button
-            this.startBtn.style.display = 'none';
-            this.captureBtn.style.display = 'block';
+            // Hide start button, show capture button (if present)
+            if (this.startBtn) this.startBtn.style.display = 'none';
+            if (this.captureBtn) this.captureBtn.style.display = 'block';
 
             // Start first photo capture
             this.captureNextPhoto();
         } catch (error) {
             console.error('Session creation error:', error);
-            this.showError('Failed to start session. Please try again.');
+            // Show more helpful message if available
+            const message = error && error.message ? error.message : 'Failed to start session. Please try again.';
+            this.showError(message);
         }
     }
 
@@ -114,32 +242,62 @@ class PhotoCapture {
 
         this.currentPhoto++;
         this.updateProgress();
-        this.showCountdown();
+        // Determine delay from select (0,3,5). Default to 3 if missing.
+        let delay = 3;
+        try {
+            if (this.delaySelect && this.delaySelect.value !== undefined) {
+                delay = parseInt(this.delaySelect.value, 10) || 0;
+            }
+        } catch (e) { /* ignore */ }
+
+        if (delay === 0) {
+            // immediate capture
+            this.triggerCapture();
+        } else {
+            this.showCountdown(delay);
+        }
     }
 
     updateProgress() {
         const progress = (this.currentPhoto / this.totalPhotos) * 100;
-        this.progressFill.style.width = `${progress}%`;
-        this.progressText.textContent = `Photo ${this.currentPhoto}/${this.totalPhotos}`;
+        if (this.progressFill) {
+            this.progressFill.style.width = `${progress}%`;
+        }
+        if (this.progressText) {
+            this.progressText.textContent = `Photo ${this.currentPhoto}/${this.totalPhotos}`;
+        }
     }
 
-    showCountdown() {
+    showCountdown(seconds = 3) {
+        if (!this.countdownOverlay || !this.countdownNumber) {
+            // Fallback: trigger immediate capture if countdown elements missing
+            this.triggerCapture();
+            return;
+        }
+
+        // Clear any previous countdown
+        if (this._countdownInterval) {
+            clearInterval(this._countdownInterval);
+            this._countdownInterval = null;
+        }
+
         this.countdownOverlay.style.display = 'flex';
-        this.countdownLabel.textContent = `Photo ${this.currentPhoto}/${this.totalPhotos}`;
+        if (this.countdownLabel) this.countdownLabel.textContent = `Photo ${this.currentPhoto}/${this.totalPhotos}`;
         
-        let count = 3;
+        let count = parseInt(seconds, 10) || 3;
         this.countdownNumber.textContent = count;
 
-        const countdownInterval = setInterval(() => {
+        this._countdownInterval = setInterval(() => {
             count--;
             if (count > 0) {
                 this.countdownNumber.textContent = count;
             } else {
                 this.countdownNumber.textContent = '📸';
-                clearInterval(countdownInterval);
+                clearInterval(this._countdownInterval);
+                this._countdownInterval = null;
                 
                 setTimeout(() => {
-                    this.countdownOverlay.style.display = 'none';
+                    if (this.countdownOverlay) this.countdownOverlay.style.display = 'none';
                     this.triggerCapture();
                 }, 500);
             }
@@ -196,13 +354,42 @@ class PhotoCapture {
             const data = await response.json();
             this.capturedPhotos.push(data);
             this.hideLoading();
+            // Add thumbnail into right panel
+            this.addThumbnailToPanel(data);
+            // Show preview modal for user to confirm or retake
             this.showPreview(data);
+            // If we've captured all photos, enable proceed button
+            if (this.capturedPhotos.length >= this.totalPhotos) {
+                if (this.proceedBtn) this.proceedBtn.style.display = 'inline-flex';
+            }
 
         } catch (error) {
             console.error('Upload error:', error);
             this.hideLoading();
             this.showError(`Failed to save photo: ${error.message}`);
         }
+    }
+
+    addThumbnailToPanel(photoData) {
+        if (!this.thumbList) return;
+        // Find first empty thumb
+        const emptyThumb = this.thumbList.querySelector('.thumb.empty');
+        if (!emptyThumb) {
+            // If none empty, append at end
+            const thumb = document.createElement('div');
+            thumb.className = 'thumb';
+            const img = document.createElement('img');
+            img.src = photoData.thumbnail_url || photoData.processed_url || photoData.original_url || '';
+            thumb.appendChild(img);
+            this.thumbList.appendChild(thumb);
+            return;
+        }
+        emptyThumb.classList.remove('empty');
+        // replace content with image
+        emptyThumb.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = photoData.thumbnail_url || photoData.processed_url || photoData.original_url || '';
+        emptyThumb.appendChild(img);
     }
 
     showPreview(photoData) {

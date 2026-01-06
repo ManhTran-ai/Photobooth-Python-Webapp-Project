@@ -19,3 +19,4 @@ qrcode==7.4.2
 # Testing (Optional)
 pytest==7.4.0
 pytest-flask==1.2.0
+cairosvg==2.0.5

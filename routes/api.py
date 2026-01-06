@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 from models.image_processor import ImageProcessor
 from models.filter_engine import FilterEngine
 from models.database import db, Session, Photo, FilterApplied
+from models.template_engine import TemplateEngine
 from datetime import datetime
 import os
 import uuid
@@ -14,6 +15,9 @@ import io
 from PIL import Image
 
 api_bp = Blueprint('api', __name__)
+
+# instantiate a TemplateEngine; output_dir will be adjusted per app config if needed
+template_engine = TemplateEngine()
 
 
 @api_bp.route('/upload', methods=['POST'])
@@ -199,6 +203,34 @@ def capture_photo():
         )
         ImageProcessor.save_image(thumbnail_image, thumbnail_path)
         
+        # Create a template-slot-sized preview for faster client preview
+        try:
+            templates_json = os.path.join(current_app.static_folder, 'templates', 'templates.json')
+            slot_size = (540, 400)
+            if os.path.exists(templates_json):
+                import json
+                with open(templates_json, 'r', encoding='utf-8') as fh:
+                    tmpl_data = json.load(fh)
+                # find max photo_size among templates
+                max_w, max_h = 0, 0
+                for t in tmpl_data.values():
+                    ps = t.get('photo_size')
+                    if ps and isinstance(ps, list) and len(ps) >= 2:
+                        max_w = max(max_w, int(ps[0]))
+                        max_h = max(max_h, int(ps[1]))
+                if max_w and max_h:
+                    slot_size = (max_w, max_h)
+            # Use TemplateEngine resize_and_crop to preserve crop behavior
+            engine = TemplateEngine()
+            slot_image = engine._resize_and_crop(processed_image.copy(), slot_size)
+            name_root, ext = base_filename.rsplit('.', 1)
+            slot_filename = f"{name_root}_slot.jpg"
+            slot_path = os.path.join(current_app.config['PROCESSED_FOLDER'], slot_filename)
+            ImageProcessor.save_image(slot_image, slot_path)
+            slot_url = f'/api/images/processed/{slot_filename}'
+        except Exception:
+            slot_url = None
+        
         # Save to database
         photo = Photo(
             session_id=session_id,
@@ -224,6 +256,7 @@ def capture_photo():
             'original_url': f'/api/images/originals/{base_filename}',
             'processed_url': f'/api/images/processed/{base_filename}',
             'thumbnail_url': f'/api/images/thumbnails/{base_filename}',
+            'slot_url': slot_url,
             'photo_number': photo_number
         })
         
@@ -242,16 +275,29 @@ def get_session_photos(session_id):
         
         photos = Photo.query.filter_by(session_id=session_id).order_by(Photo.photo_number).all()
         
-        return jsonify({
-            'success': True,
-            'photos': [{
+        result_photos = []
+        for photo in photos:
+            name_root, ext = photo.original_filename.rsplit('.', 1)
+            slot_filename = f"{name_root}_{photo.photo_number}_slot.jpg"
+            # older slot naming may be name_root_slot.jpg, so check both
+            possible_slot1 = f"{name_root}_slot.jpg"
+            possible_slot2 = slot_filename
+            slot_url = None
+            for fname in (possible_slot2, possible_slot1):
+                if os.path.exists(os.path.join(current_app.config['PROCESSED_FOLDER'], fname)):
+                    slot_url = url_for('api.serve_image', folder='processed', filename=fname)
+                    break
+
+            result_photos.append({
                 'id': photo.id,
                 'photo_number': photo.photo_number,
                 'original_url': f'/api/images/originals/{photo.original_filename}',
                 'processed_url': f'/api/images/processed/{photo.processed_filename}',
-                'thumbnail_url': f'/api/images/thumbnails/{photo.thumbnail_filename}'
-            } for photo in photos]
-        })
+                'thumbnail_url': f'/api/images/thumbnails/{photo.thumbnail_filename}',
+                'slot_url': slot_url
+            })
+
+        return jsonify({'success': True, 'photos': result_photos})
     except Exception as e:
         return jsonify({'error': f'Failed to get photos: {str(e)}'}), 500
 
@@ -283,6 +329,139 @@ def get_filters():
         })
     except Exception as e:
         return jsonify({'error': f'Failed to get filters: {str(e)}'}), 500
+
+
+@api_bp.route('/templates', methods=['GET'])
+def get_templates():
+    """Return available template metadata and preview URLs"""
+    try:
+        templates = template_engine.get_available_templates()
+        enriched = {}
+        for name, meta in templates.items():
+            preview_path = os.path.join(current_app.static_folder, 'templates', 'previews', f"{name}_preview.png")
+            preview_url = None
+            if os.path.exists(preview_path):
+                preview_url = url_for('static', filename=os.path.join('templates', 'previews', f"{name}_preview.png"))
+            enriched[name] = {**meta, 'preview': preview_url}
+        return jsonify({'success': True, 'templates': enriched})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/collage', methods=['POST'])
+def create_collage():
+    """
+    Create collage synchronously.
+    Accepts JSON:
+      - session_id or image_ids
+      - template
+      - colors (dict)
+      - decorations (list of {'path','x','y','scale','color'}). 'path' can be server static path.
+      - fill_mode: duplicate|placeholder|center
+      - use_processed: bool (default True) - use processed images if available
+    """
+    try:
+        data = request.get_json() or {}
+        template_name = data.get('template', 'classic_strip')
+        fill_mode = data.get('fill_mode', 'duplicate')
+        colors = data.get('colors') or {}
+        decorations = data.get('decorations') or []
+        use_processed = data.get('use_processed', True)  # Default: sử dụng ảnh đã xử lý
+
+        image_paths = []
+        if 'session_id' in data:
+            session_id = data['session_id']
+            photos = Photo.query.filter_by(session_id=session_id).order_by(Photo.photo_number).all()
+            for p in photos:
+                # Ưu tiên sử dụng ảnh đã xử lý filter nếu có
+                if use_processed and p.processed_filename:
+                    abspath = os.path.join(current_app.config['PROCESSED_FOLDER'], p.processed_filename)
+                    if os.path.exists(abspath):
+                        image_paths.append(abspath)
+                        continue
+                # Fallback về ảnh gốc
+                abspath = os.path.join(current_app.config['ORIGINALS_FOLDER'], p.original_filename)
+                if os.path.exists(abspath):
+                    image_paths.append(abspath)
+        elif 'image_ids' in data:
+            ids = data['image_ids']
+            photos = Photo.query.filter(Photo.id.in_(ids)).order_by(Photo.photo_number).all()
+            for p in photos:
+                # Ưu tiên sử dụng ảnh đã xử lý filter nếu có
+                if use_processed and p.processed_filename:
+                    abspath = os.path.join(current_app.config['PROCESSED_FOLDER'], p.processed_filename)
+                    if os.path.exists(abspath):
+                        image_paths.append(abspath)
+                        continue
+                # Fallback về ảnh gốc
+                abspath = os.path.join(current_app.config['ORIGINALS_FOLDER'], p.original_filename)
+                if os.path.exists(abspath):
+                    image_paths.append(abspath)
+        else:
+            return jsonify({'error': 'Provide session_id or image_ids'}), 400
+
+        # Ensure template engine uses app collage folder
+        template_engine.output_dir = current_app.config.get('COLLAGES_FOLDER', template_engine.output_dir)
+
+        # Decorations: if the client provides decoration name, convert to static path
+        processed_decorations = []
+        for deco in decorations:
+            path = deco.get('path')
+            # Only allow decorations from our static templates/decorations directory
+            if not path:
+                continue
+            if not os.path.isabs(path):
+                # normalize path; allow decorations from templates/decorations or templates/stickers
+                norm = path.replace('\\', '/').lstrip('/')
+                allowed_prefixes = ('templates/decorations/', 'templates/stickers/', 'static/templates/decorations/', 'static/templates/stickers/')
+                if not any(norm.startswith(pref) for pref in allowed_prefixes):
+                    return jsonify({'error': 'Invalid decoration path'}), 400
+                # if path already starts with 'static/', strip it to produce path relative to static folder
+                if norm.startswith('static/'):
+                    rel = norm[len('static/'):]
+                else:
+                    rel = norm
+                abs_path = os.path.join(current_app.static_folder, rel)
+            else:
+                abs_path = path
+
+            # Verify file exists and is under static folder
+            try:
+                abs_path = os.path.abspath(abs_path)
+                if not abs_path.startswith(os.path.abspath(current_app.static_folder)):
+                    return jsonify({'error': 'Decoration path not allowed'}), 400
+                if not os.path.exists(abs_path):
+                    return jsonify({'error': f'Decoration file not found: {path}'}), 400
+            except Exception:
+                return jsonify({'error': 'Invalid decoration path'}), 400
+
+            # sanitize numeric values
+            try:
+                x = int(float(deco.get('x', 0)))
+                y = int(float(deco.get('y', 0)))
+                scale = float(deco.get('scale', 1.0))
+            except Exception:
+                return jsonify({'error': 'Invalid decoration coordinates/scale'}), 400
+
+            processed_decorations.append({
+                'path': abs_path,
+                'x': x,
+                'y': y,
+                'scale': scale,
+                'color': deco.get('color')
+            })
+
+        output_path = template_engine.create_collage(image_paths, template_name, colors=colors, decorations=processed_decorations, fill_mode=fill_mode)
+        # make url relative to static folder if possible
+        try:
+            relative = os.path.relpath(output_path, current_app.static_folder)
+            collage_url = url_for('static', filename=relative.replace("\\", "/"))
+        except Exception:
+            collage_url = output_path
+
+        return jsonify({'success': True, 'collage_url': collage_url})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @api_bp.route('/apply-filter', methods=['POST'])
@@ -413,4 +592,291 @@ def health_check():
         'status': 'ok',
         'message': 'Photobooth API is running'
     })
+
+
+# ============== FACE DETECTION API ENDPOINTS ==============
+
+@api_bp.route('/face-detect', methods=['POST'])
+def detect_faces_api():
+    """
+    Detect faces in an image
+
+    Accepts:
+    - Form data with 'image' file
+    - OR JSON with 'image_url' (relative path like /api/images/processed/xxx.jpg)
+    - OR JSON with 'filename' (just filename, assumes processed folder)
+
+    Returns:
+    - faces: List of detected faces with bbox, confidence, center
+    - count: Number of faces detected
+    """
+    try:
+        from models.face_detector import get_detector
+        detector = get_detector()
+
+        image = None
+
+        # Option 1: File upload
+        if 'image' in request.files:
+            file = request.files['image']
+            image_data = file.read()
+            image = Image.open(io.BytesIO(image_data))
+
+        # Option 2: JSON with filename/url
+        elif request.is_json:
+            data = request.get_json()
+            filename = data.get('filename')
+            image_url = data.get('image_url')
+
+            if filename:
+                # Look in processed folder
+                filepath = os.path.join(
+                    current_app.config['PROCESSED_FOLDER'],
+                    filename
+                )
+                if os.path.exists(filepath):
+                    image = Image.open(filepath)
+            elif image_url:
+                # Parse URL to get filename
+                parts = image_url.split('/')
+                if len(parts) >= 2:
+                    folder = parts[-2]  # e.g., 'processed'
+                    fname = parts[-1]
+                    folder_key = f'{folder.upper()}_FOLDER'
+                    if folder_key in current_app.config:
+                        filepath = os.path.join(
+                            current_app.config[folder_key],
+                            fname
+                        )
+                        if os.path.exists(filepath):
+                            image = Image.open(filepath)
+
+        if image is None:
+            return jsonify({'error': 'No valid image provided'}), 400
+
+        # Detect faces
+        confidence = request.args.get('confidence', 0.5, type=float)
+        faces = detector.detect_faces(image, confidence_threshold=confidence)
+
+        # Format response
+        faces_response = []
+        for face in faces:
+            faces_response.append({
+                'bbox': {
+                    'x': face['bbox'][0],
+                    'y': face['bbox'][1],
+                    'width': face['bbox'][2],
+                    'height': face['bbox'][3]
+                },
+                'confidence': round(face['confidence'], 4),
+                'center': {
+                    'x': face['center'][0],
+                    'y': face['center'][1]
+                }
+            })
+
+        return jsonify({
+            'success': True,
+            'count': len(faces_response),
+            'faces': faces_response
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Face detection failed: {str(e)}'}), 500
+
+
+@api_bp.route('/auto-crop', methods=['POST'])
+def auto_crop_portrait():
+    """
+    Auto crop image to center on face with portrait ratio
+
+    Accepts:
+    - Form data with 'image' file
+    - OR JSON with 'filename'
+
+    Query params:
+    - ratio: target height/width ratio (default 1.33 = 4:3 portrait)
+    - padding: padding around face (default 0.4)
+    - save: if 'true', save to processed folder
+
+    Returns:
+    - Cropped image as base64 or URL if saved
+    """
+    try:
+        from models.face_detector import get_detector
+        detector = get_detector()
+
+        image = None
+        original_filename = None
+
+        # Get image from request
+        if 'image' in request.files:
+            file = request.files['image']
+            image_data = file.read()
+            image = Image.open(io.BytesIO(image_data))
+            original_filename = secure_filename(file.filename)
+        elif request.is_json:
+            data = request.get_json()
+            filename = data.get('filename')
+            if filename:
+                filepath = os.path.join(
+                    current_app.config['PROCESSED_FOLDER'],
+                    filename
+                )
+                if os.path.exists(filepath):
+                    image = Image.open(filepath)
+                    original_filename = filename
+
+        if image is None:
+            return jsonify({'error': 'No valid image provided'}), 400
+
+        # Get parameters
+        ratio = request.args.get('ratio', 1.33, type=float)
+        padding = request.args.get('padding', 0.4, type=float)
+        save = request.args.get('save', 'false').lower() == 'true'
+
+        # Auto crop
+        cropped = detector.auto_crop_portrait(image, target_ratio=ratio, padding=padding)
+
+        if save and original_filename:
+            # Save cropped image
+            cropped_filename = f'cropped_{original_filename}'
+            cropped_path = os.path.join(
+                current_app.config['PROCESSED_FOLDER'],
+                cropped_filename
+            )
+            cropped.save(cropped_path, 'JPEG', quality=90)
+
+            return jsonify({
+                'success': True,
+                'filename': cropped_filename,
+                'url': f'/api/images/processed/{cropped_filename}'
+            })
+        else:
+            # Return as base64
+            buffer = io.BytesIO()
+            cropped.save(buffer, format='JPEG', quality=90)
+            base64_image = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+            return jsonify({
+                'success': True,
+                'image_base64': base64_image,
+                'width': cropped.width,
+                'height': cropped.height
+            })
+
+    except Exception as e:
+        return jsonify({'error': f'Auto crop failed: {str(e)}'}), 500
+
+
+@api_bp.route('/sticker-positions', methods=['POST'])
+def get_sticker_positions():
+    """
+    Get suggested sticker positions based on face detection
+
+    Accepts:
+    - Form data with 'image' file
+    - OR JSON with 'filename'
+
+    Query params:
+    - sticker_type: 'hat', 'glasses', 'ears', 'mustache' (default 'hat')
+
+    Returns:
+    - positions: List of suggested positions for each detected face
+    """
+    try:
+        from models.face_detector import get_detector
+        detector = get_detector()
+
+        image = None
+
+        # Get image
+        if 'image' in request.files:
+            file = request.files['image']
+            image = Image.open(io.BytesIO(file.read()))
+        elif request.is_json:
+            data = request.get_json()
+            filename = data.get('filename')
+            if filename:
+                filepath = os.path.join(
+                    current_app.config['PROCESSED_FOLDER'],
+                    filename
+                )
+                if os.path.exists(filepath):
+                    image = Image.open(filepath)
+
+        if image is None:
+            return jsonify({'error': 'No valid image provided'}), 400
+
+        sticker_type = request.args.get('sticker_type', 'hat')
+
+        positions = detector.get_face_positions_for_stickers(image, sticker_type)
+
+        # Format response
+        positions_response = []
+        for pos in positions:
+            positions_response.append({
+                'x': pos['x'],
+                'y': pos['y'],
+                'scale': round(pos['scale'], 3),
+                'anchor': pos['anchor'],
+                'face_bbox': {
+                    'x': pos['face_bbox'][0],
+                    'y': pos['face_bbox'][1],
+                    'width': pos['face_bbox'][2],
+                    'height': pos['face_bbox'][3]
+                },
+                'confidence': round(pos['confidence'], 4)
+            })
+
+        return jsonify({
+            'success': True,
+            'sticker_type': sticker_type,
+            'count': len(positions_response),
+            'positions': positions_response
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Sticker position detection failed: {str(e)}'}), 500
+
+
+@api_bp.route('/face-debug', methods=['POST'])
+def face_debug():
+    """
+    Debug endpoint: Draw face detection boxes on image
+
+    Accepts: Form data with 'image' file
+    Returns: Image with face boxes drawn as base64
+    """
+    try:
+        from models.face_detector import get_detector
+        detector = get_detector()
+
+        if 'image' not in request.files:
+            return jsonify({'error': 'No image provided'}), 400
+
+        file = request.files['image']
+        image = Image.open(io.BytesIO(file.read()))
+
+        # Detect and draw
+        result = detector.draw_faces(image)
+
+        # Return as base64
+        buffer = io.BytesIO()
+        result.save(buffer, format='JPEG', quality=90)
+        base64_image = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+        faces = detector.detect_faces(image)
+
+        return jsonify({
+            'success': True,
+            'image_base64': base64_image,
+            'faces_detected': len(faces)
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Face debug failed: {str(e)}'}), 500
+
+
+
 
