@@ -875,6 +875,350 @@ def get_sticker_positions():
         return jsonify({'error': f'Sticker position detection failed: {str(e)}'}), 500
 
 
+@api_bp.route('/stickers/processed', methods=['GET'])
+def get_processed_sticker():
+    """
+    Return processed sticker PNG with transparent background.
+    Query params:
+      - name: filename under static/templates (e.g., hat.png)
+    Saves processed file under static/templates/processed/<name> and returns URL.
+    """
+    try:
+        name = request.args.get('name')
+        if not name:
+            return jsonify({'error': 'Missing sticker name'}), 400
+
+        # Normalize name to prevent path traversal
+        name = os.path.basename(name)
+
+        # Stickers are now stored directly in static/templates/
+        templates_dir = os.path.join(current_app.static_folder, 'templates')
+        src_path = os.path.join(templates_dir, name)
+
+        # Fallback to stickers subdirectory if not found
+        if not os.path.exists(src_path):
+            stickers_dir = os.path.join(templates_dir, 'stickers')
+            src_path = os.path.join(stickers_dir, name)
+
+        if not os.path.exists(src_path):
+            return jsonify({'error': f'Sticker not found: {name}'}), 404
+
+        processed_dir = os.path.join(templates_dir, 'processed')
+        os.makedirs(processed_dir, exist_ok=True)
+        processed_path = os.path.join(processed_dir, name)
+
+        # If already processed, return URL
+        if os.path.exists(processed_path):
+            rel = os.path.relpath(processed_path, current_app.static_folder)
+            return jsonify({'processed_url': url_for('static', filename=rel.replace("\\", "/"))})
+
+        # Process sticker: remove background using TemplateEngine helper
+        try:
+            img = Image.open(src_path).convert('RGBA')
+            processed_img = TemplateEngine._remove_sticker_background(img)
+            # Save processed PNG
+            processed_img.save(processed_path, 'PNG')
+            rel = os.path.relpath(processed_path, current_app.static_folder)
+            return jsonify({'processed_url': url_for('static', filename=rel.replace("\\", "/"))})
+        except Exception as e:
+            # If processing fails, fall back to original static path
+            rel = os.path.relpath(src_path, current_app.static_folder)
+            return jsonify({'processed_url': url_for('static', filename=rel.replace("\\", "/")), 'warning': str(e)})
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to process sticker: {str(e)}'}), 500
+
+
+@api_bp.route('/apply-sticker', methods=['POST'])
+def apply_sticker_to_photo():
+    """
+    Apply sticker overlay to a photo based on face detection.
+
+    Request JSON:
+    - filename: image filename in processed folder
+    - sticker_type: 'hat', 'glasses', 'ears', 'mustache'
+    - save: if True, save the result (default: False for preview)
+
+    Returns:
+    - success: bool
+    - result_url: URL of the processed image (base64 if preview, file URL if saved)
+    - positions: list of face positions where stickers were applied
+    """
+    try:
+        from models.face_detector import get_detector
+        detector = get_detector()
+
+        data = request.get_json() or {}
+        filename = data.get('filename')
+        sticker_type = data.get('sticker_type', 'hat')
+        save_result = data.get('save', False)
+
+        if not filename:
+            return jsonify({'error': 'Missing filename'}), 400
+
+        # Load the photo
+        filepath = os.path.join(current_app.config['PROCESSED_FOLDER'], filename)
+        if not os.path.exists(filepath):
+            return jsonify({'error': f'Image not found: {filename}'}), 404
+
+        image = Image.open(filepath).convert('RGBA')
+
+        # Get sticker file - mapping các loại phụ kiện
+        sticker_map = {
+            'hat': 'hat-2.png',
+            'glasses': 'glasses.png',
+            'ears': 'rabbit_ears.png',
+            'mustache': 'mustache.png',
+            'noel_hat': 'noel-hat.png',
+            'bow': 'No.png'
+        }
+        sticker_name = sticker_map.get(sticker_type, 'hat-2.png')
+
+        # Try to find sticker in templates folder
+        templates_dir = os.path.join(current_app.static_folder, 'templates')
+        sticker_path = os.path.join(templates_dir, sticker_name)
+
+        if not os.path.exists(sticker_path):
+            return jsonify({'error': f'Sticker not found: {sticker_name}'}), 404
+
+        sticker = Image.open(sticker_path).convert('RGBA')
+
+        # Detect faces and get positions
+        positions = detector.get_face_positions_for_stickers(image, sticker_type)
+
+        if not positions:
+            return jsonify({
+                'success': True,
+                'warning': 'No faces detected in image',
+                'positions': []
+            })
+
+        # Apply sticker to each detected face
+        result_image = image.copy()
+        applied_positions = []
+
+        for pos in positions:
+            # Calculate sticker size based on face
+            face_width = pos['face_bbox'][2]
+
+            # Size multiplier based on sticker type
+            size_multipliers = {
+                'hat': 1.4,       # Mũ rộng hơn mặt
+                'glasses': 1.1,   # Kính vừa với mặt
+                'ears': 1.6,      # Tai thỏ rộng
+                'mustache': 0.5,  # Râu nhỏ hơn
+                'noel_hat': 1.5,  # Nón Noel rộng
+                'bow': 0.6        # Nơ nhỏ gọn
+            }
+            multiplier = size_multipliers.get(sticker_type, 1.0)
+            target_width = int(face_width * multiplier)
+
+            # Maintain aspect ratio
+            sticker_ratio = sticker.height / sticker.width
+            target_height = int(target_width * sticker_ratio)
+
+            # Resize sticker
+            resized_sticker = sticker.resize((target_width, target_height), Image.LANCZOS)
+
+            # Calculate paste position (centered on anchor point)
+            paste_x = pos['x'] - target_width // 2
+            paste_y = pos['y'] - target_height // 2
+
+            # Adjust for anchor type
+            anchor = pos.get('anchor', 'center')
+            if anchor == 'bottom-center':
+                paste_y = pos['y'] - target_height
+
+            # Ensure position is within bounds
+            paste_x = max(0, min(paste_x, result_image.width - target_width))
+            paste_y = max(0, min(paste_y, result_image.height - target_height))
+
+            # Paste sticker with transparency
+            result_image.paste(resized_sticker, (paste_x, paste_y), resized_sticker)
+
+            applied_positions.append({
+                'x': pos['x'],
+                'y': pos['y'],
+                'width': target_width,
+                'height': target_height,
+                'confidence': pos['confidence']
+            })
+
+        # Convert result to RGB for saving/preview
+        result_rgb = Image.new('RGB', result_image.size, (255, 255, 255))
+        result_rgb.paste(result_image, mask=result_image.split()[3] if result_image.mode == 'RGBA' else None)
+
+        if save_result:
+            # Save to processed folder with sticker suffix
+            name, ext = os.path.splitext(filename)
+            output_filename = f"{name}_sticker_{sticker_type}{ext}"
+            output_path = os.path.join(current_app.config['PROCESSED_FOLDER'], output_filename)
+            result_rgb.save(output_path, 'JPEG', quality=95)
+
+            return jsonify({
+                'success': True,
+                'filename': output_filename,
+                'result_url': f'/api/images/processed/{output_filename}',
+                'positions': applied_positions
+            })
+        else:
+            # Return as base64 for preview
+            buffer = io.BytesIO()
+            result_rgb.save(buffer, format='JPEG', quality=90)
+            base64_image = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+            return jsonify({
+                'success': True,
+                'result_base64': f'data:image/jpeg;base64,{base64_image}',
+                'positions': applied_positions
+            })
+
+    except Exception as e:
+        return jsonify({'error': f'Apply sticker failed: {str(e)}'}), 500
+
+
+@api_bp.route('/apply-sticker-session', methods=['POST'])
+def apply_sticker_to_session():
+    """
+    Apply sticker to all photos in a session based on face detection.
+
+    Request JSON:
+    - session_id: session ID
+    - sticker_type: 'hat', 'glasses', 'ears', 'mustache'
+    - save: if True, save and update session photos (default: True)
+
+    Returns:
+    - success: bool
+    - results: list of results for each photo
+    """
+    try:
+        from models.face_detector import get_detector
+        detector = get_detector()
+
+        data = request.get_json() or {}
+        session_id = data.get('session_id')
+        sticker_type = data.get('sticker_type', 'hat')
+        save_result = data.get('save', True)
+
+        if not session_id:
+            return jsonify({'error': 'Missing session_id'}), 400
+
+        # Get session photos
+        session = Session.query.filter_by(id=session_id).first()
+        if not session:
+            return jsonify({'error': 'Session not found'}), 404
+
+        photos = Photo.query.filter_by(session_id=session_id).order_by(Photo.photo_number).all()
+        if not photos:
+            return jsonify({'error': 'No photos in session'}), 404
+
+        # Get sticker - mapping các loại phụ kiện
+        sticker_map = {
+            'hat': 'hat-2.png',
+            'glasses': 'glasses.png',
+            'ears': 'rabbit_ears.png',
+            'mustache': 'mustache.png',
+            'noel_hat': 'noel-hat.png',
+            'bow': 'No.png'
+        }
+        sticker_name = sticker_map.get(sticker_type, 'hat-2.png')
+
+        templates_dir = os.path.join(current_app.static_folder, 'templates')
+        sticker_path = os.path.join(templates_dir, sticker_name)
+
+        if not os.path.exists(sticker_path):
+            return jsonify({'error': f'Sticker not found: {sticker_name}'}), 404
+
+        sticker = Image.open(sticker_path).convert('RGBA')
+
+        results = []
+
+        for photo in photos:
+            filename = photo.processed_filename or photo.original_filename
+            filepath = os.path.join(current_app.config['PROCESSED_FOLDER'], filename)
+
+            if not os.path.exists(filepath):
+                results.append({
+                    'photo_id': photo.id,
+                    'success': False,
+                    'error': 'File not found'
+                })
+                continue
+
+            try:
+                image = Image.open(filepath).convert('RGBA')
+                positions = detector.get_face_positions_for_stickers(image, sticker_type)
+
+                if not positions:
+                    results.append({
+                        'photo_id': photo.id,
+                        'success': True,
+                        'warning': 'No faces detected',
+                        'faces': 0
+                    })
+                    continue
+
+                # Apply sticker to each face
+                result_image = image.copy()
+
+                for pos in positions:
+                    face_width = pos['face_bbox'][2]
+                    size_multipliers = {
+                        'hat': 1.4, 'glasses': 1.1, 'ears': 1.6,
+                        'mustache': 0.5, 'noel_hat': 1.5, 'bow': 0.6
+                    }
+                    target_width = int(face_width * size_multipliers.get(sticker_type, 1.0))
+                    sticker_ratio = sticker.height / sticker.width
+                    target_height = int(target_width * sticker_ratio)
+
+                    resized_sticker = sticker.resize((target_width, target_height), Image.LANCZOS)
+
+                    paste_x = pos['x'] - target_width // 2
+                    paste_y = pos['y'] - target_height // 2
+
+                    if pos.get('anchor') == 'bottom-center':
+                        paste_y = pos['y'] - target_height
+
+                    paste_x = max(0, min(paste_x, result_image.width - target_width))
+                    paste_y = max(0, min(paste_y, result_image.height - target_height))
+
+                    result_image.paste(resized_sticker, (paste_x, paste_y), resized_sticker)
+
+                # Save result
+                if save_result:
+                    result_rgb = Image.new('RGB', result_image.size, (255, 255, 255))
+                    if result_image.mode == 'RGBA':
+                        result_rgb.paste(result_image, mask=result_image.split()[3])
+                    else:
+                        result_rgb.paste(result_image)
+                    result_rgb.save(filepath, 'JPEG', quality=95)
+
+                results.append({
+                    'photo_id': photo.id,
+                    'success': True,
+                    'faces': len(positions),
+                    'filename': filename
+                })
+
+            except Exception as e:
+                results.append({
+                    'photo_id': photo.id,
+                    'success': False,
+                    'error': str(e)
+                })
+
+        return jsonify({
+            'success': True,
+            'sticker_type': sticker_type,
+            'results': results,
+            'total_photos': len(photos),
+            'photos_with_faces': sum(1 for r in results if r.get('faces', 0) > 0)
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Apply sticker to session failed: {str(e)}'}), 500
+
+
 @api_bp.route('/face-debug', methods=['POST'])
 def face_debug():
     """

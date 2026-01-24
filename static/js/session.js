@@ -383,6 +383,7 @@ async function applyAIFilter(filterName, button) {
 
 /**
  * Initialize Auto Sticker buttons
+ * Click: Gắn phụ kiện trực tiếp vào ảnh
  */
 function initAutoStickerButtons() {
     const stickerButtons = document.querySelectorAll('.btn-auto-sticker');
@@ -390,15 +391,29 @@ function initAutoStickerButtons() {
     stickerButtons.forEach(btn => {
         btn.addEventListener('click', async () => {
             const stickerType = btn.dataset.type;
-            await autoPlaceSticker(stickerType, btn);
+            // Always bake into image (true) for simpler UX
+            await autoPlaceSticker(stickerType, btn, true);
+        });
+
+        // Add hover effect
+        btn.addEventListener('mouseenter', () => {
+            btn.style.transform = 'scale(1.05)';
+            btn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.transform = 'scale(1)';
+            btn.style.boxShadow = 'none';
         });
     });
 }
 
 /**
  * Auto place sticker based on face detection
+ * @param {string} stickerType - Type of sticker: 'hat', 'glasses', 'ears', 'mustache', 'noel_hat', 'bow'
+ * @param {HTMLElement} button - Button element for visual feedback
+ * @param {boolean} bakeIntoImage - If true, apply sticker directly to image files
  */
-async function autoPlaceSticker(stickerType, button) {
+async function autoPlaceSticker(stickerType, button, bakeIntoImage = true) {
     const sessionId = getSessionId();
     if (!sessionId) {
         showNotification('Session không hợp lệ', 'error');
@@ -407,50 +422,80 @@ async function autoPlaceSticker(stickerType, button) {
 
     // Visual feedback
     const originalText = button.innerHTML;
-    button.innerHTML = '⏳...';
+    button.innerHTML = '⏳ Đang xử lý...';
     button.disabled = true;
 
     try {
-        // First, get the photos in session
-        const photosResponse = await fetch(`/api/sessions/${sessionId}/photos`);
-
-        if (!photosResponse.ok) {
-            throw new Error(`Server error: ${photosResponse.status}`);
-        }
-
-        const photosData = await photosResponse.json();
-
-        if (!photosData.photos || photosData.photos.length === 0) {
-            throw new Error('Không có ảnh trong session');
-        }
-
-        // For each photo, detect face and get sticker positions
-        for (const photo of photosData.photos) {
-            const filename = photo.processed_filename || photo.original_filename;
-
-            const response = await fetch(`/api/sticker-positions?sticker_type=${stickerType}`, {
+        if (bakeIntoImage) {
+            // Apply sticker directly to session photos using new API
+            const response = await fetch('/api/apply-sticker-session', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    filename: filename
+                    session_id: sessionId,
+                    sticker_type: stickerType,
+                    save: true
                 })
             });
 
             const data = await response.json();
 
-            if (data.success && data.positions && data.positions.length > 0) {
-                // Add stickers to collage preview at detected positions
-                data.positions.forEach(pos => {
-                    if (typeof addStickerToCollage === 'function') {
-                        addStickerToCollage(stickerType, pos.x, pos.y, pos.scale);
-                    }
-                });
+            if (data.success) {
+                // Refresh the collage preview
+                if (typeof refreshCollagePreview === 'function') {
+                    refreshCollagePreview();
+                }
+                const displayName = STICKER_NAMES[stickerType] || stickerType;
+                showNotification(`🎭 Đã gắn ${displayName} vào ${data.photos_with_faces} ảnh có khuôn mặt!`, 'success');
+            } else {
+                throw new Error(data.error || 'Failed to apply sticker');
             }
-        }
+        } else {
+            // Overlay mode - just show stickers on preview (existing behavior)
+            const photosResponse = await fetch(`/api/sessions/${sessionId}/photos`);
 
-        showNotification(`🎭 Đã thêm sticker ${stickerType} dựa trên face detection`, 'success');
+            if (!photosResponse.ok) {
+                throw new Error(`Server error: ${photosResponse.status}`);
+            }
+
+            const photosData = await photosResponse.json();
+
+            if (!photosData.photos || photosData.photos.length === 0) {
+                throw new Error('Không có ảnh trong session');
+            }
+
+            // Clear existing sticker overlays
+            document.querySelectorAll('.auto-sticker-overlay').forEach(el => el.remove());
+
+            // For each photo, detect face and get sticker positions
+            for (const photo of photosData.photos) {
+                const filename = photo.processed_filename || photo.original_filename;
+
+                const response = await fetch(`/api/sticker-positions?sticker_type=${stickerType}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        filename: filename
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.positions && data.positions.length > 0) {
+                    // Add stickers to collage preview at detected positions
+                    data.positions.forEach(pos => {
+                        addStickerToCollage(stickerType, pos.x, pos.y, pos.scale, filename);
+                    });
+                }
+            }
+
+            const displayName = STICKER_NAMES[stickerType] || stickerType;
+            showNotification(`🎭 Đã thêm ${displayName} (preview)`, 'success');
+        }
 
     } catch (error) {
         console.error('Auto sticker error:', error);
@@ -458,6 +503,126 @@ async function autoPlaceSticker(stickerType, button) {
     } finally {
         button.innerHTML = originalText;
         button.disabled = false;
+    }
+}
+
+// Mapping from sticker types to filenames in static/templates/
+const STICKER_FILES = {
+    'hat': 'hat-2.png',
+    'glasses': 'glasses.png',
+    'ears': 'rabbit_ears.png',
+    'mustache': 'mustache.png',
+    'noel_hat': 'noel-hat.png',
+    'bow': 'No.png'
+};
+
+// Display names for sticker types
+const STICKER_NAMES = {
+    'hat': 'Mũ',
+    'glasses': 'Kính',
+    'ears': 'Tai thỏ',
+    'mustache': 'Râu',
+    'noel_hat': 'Nón Noel',
+    'bow': 'Nơ'
+};
+
+/**
+ * Add sticker overlay to the collage preview for a specific photo filename.
+ * This function requests a processed (transparent) sticker from the server
+ * and positions an absolutely positioned <img> over the matching photo preview.
+ */
+async function addStickerToCollage(stickerType, x, y, scale = 1.0, filename = null) {
+    try {
+        const stickerName = STICKER_FILES[stickerType] || STICKER_FILES['hat'];
+
+        // Request processed sticker (transparent background) from server
+        let stickerUrl = `/static/templates/${stickerName}`;
+        try {
+            const resp = await fetch(`/api/stickers/processed?name=${encodeURIComponent(stickerName)}`);
+            if (resp.ok) {
+                const j = await resp.json();
+                if (j.processed_url) stickerUrl = j.processed_url;
+            }
+        } catch (e) {
+            console.warn('Failed to fetch processed sticker, using original:', e);
+        }
+
+        // Try to find the target SVG <image> element inside the collage first
+        let svgImage = null;
+        if (filename) {
+            const svgImgs = Array.from(document.querySelectorAll('#collage-svg image'));
+            for (const si of svgImgs) {
+                try {
+                    const href = si.getAttribute('href') || si.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || '';
+                    if (href && href.endsWith(filename)) {
+                        svgImage = si;
+                        break;
+                    }
+                } catch (e) { /* ignore */ }
+            }
+        }
+
+        let left, top, rect, ratio;
+        if (svgImage) {
+            // Use SVG image bounding box and its intrinsic width (attribute) to map coordinates
+            rect = svgImage.getBoundingClientRect();
+            const intrinsicW = parseFloat(svgImage.getAttribute('width')) || rect.width;
+            ratio = rect.width / intrinsicW;
+            left = rect.left + window.scrollX + x * ratio;
+            top = rect.top + window.scrollY + y * ratio;
+        } else {
+            // Fallback: try to find an HTML <img> matching filename
+            let targetImg = null;
+            if (filename) {
+                const imgs = Array.from(document.querySelectorAll('img'));
+                for (const im of imgs) {
+                    try {
+                        const src = im.getAttribute('src') || '';
+                        if (src && src.endsWith(filename)) {
+                            targetImg = im;
+                            break;
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+            }
+            if (!targetImg) {
+                // fallback: use first photo image in DOM
+                targetImg = document.querySelector('#photos-grid img') || document.querySelector('.photo-card img') || null;
+            }
+            if (!targetImg) return;
+            rect = targetImg.getBoundingClientRect();
+            const naturalW = targetImg.naturalWidth || rect.width;
+            ratio = rect.width / naturalW;
+            left = rect.left + window.scrollX + x * ratio;
+            top = rect.top + window.scrollY + y * ratio;
+        }
+
+        // Create overlay image
+        const img = document.createElement('img');
+        img.src = stickerUrl;
+        img.alt = stickerType;
+        img.className = 'auto-sticker-overlay';
+        img.style.position = 'absolute';
+        img.style.left = `${left}px`;
+        img.style.top = `${top}px`;
+        img.style.transform = 'translate(-50%, -50%)';
+        img.style.pointerEvents = 'none';
+        img.style.zIndex = 9999;
+
+        // Determine width based on scale and face bbox heuristics (scale is relative)
+        const baseline = Math.max(60, Math.round(100 * scale));
+        img.style.width = `${Math.round(baseline * ratio)}px`;
+        img.style.height = 'auto';
+
+        document.body.appendChild(img);
+
+        // Auto-remove after some time (optional) or keep until next refresh
+        setTimeout(() => {
+            // keep overlays persistent; do not auto-remove by default
+        }, 3000);
+
+    } catch (e) {
+        console.error('addStickerToCollage failed:', e);
     }
 }
 

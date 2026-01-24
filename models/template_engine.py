@@ -337,7 +337,7 @@ class TemplateEngine:
     @staticmethod
     def _remove_sticker_background(image):
         """
-        Tách nền khỏi sticker sử dụng thư viện rembg.
+        Tách nền khỏi sticker - hỗ trợ cả checkered background và nền thông thường.
 
         Args:
             image: PIL Image object (ảnh sticker có nền)
@@ -345,41 +345,110 @@ class TemplateEngine:
         Returns:
             PIL Image: Ảnh sticker đã được tách nền, hệ màu RGBA với nền trong suốt hoàn toàn
         """
+        if image.mode != 'RGBA':
+            image = image.convert('RGBA')
+
+        # Đầu tiên, thử xóa checkered background (ô vuông đen xám xen kẽ)
+        result = TemplateEngine._remove_checkered_background(image)
+
+        # Kiểm tra xem đã xóa được nhiều pixel chưa
+        import numpy as np
+        original_arr = np.array(image)
+        result_arr = np.array(result)
+
+        original_opaque = np.sum(original_arr[:, :, 3] > 128)
+        result_opaque = np.sum(result_arr[:, :, 3] > 128)
+
+        # Nếu đã xóa được > 10% pixel, coi như thành công
+        if original_opaque > 0 and (original_opaque - result_opaque) / original_opaque > 0.1:
+            return TemplateEngine._clean_alpha_channel(result)
+
+        # Nếu không, thử dùng rembg
         try:
             import rembg
             from io import BytesIO
 
-            # Chuyển đổi ảnh sang bytes
             buffer = BytesIO()
             image.save(buffer, format='PNG')
             input_bytes = buffer.getvalue()
 
-            # Sử dụng rembg để loại bỏ nền
             output_bytes = rembg.remove(input_bytes)
-
-            # Chuyển đổi bytes trở lại thành PIL Image
             result = Image.open(BytesIO(output_bytes))
 
-            # Đảm bảo kết quả ở chế độ RGBA
             if result.mode != 'RGBA':
                 result = result.convert('RGBA')
 
-            # Post-processing: Loại bỏ nền mờ còn sót lại
             result = TemplateEngine._clean_alpha_channel(result)
-
             return result
 
         except ImportError:
-            # Nếu rembg chưa được cài đặt, thử dùng Pillow để xử lý
             return TemplateEngine._remove_background_pillow(image)
-        except Exception as e:
-            # Nếu có lỗi khi xử lý, thử dùng Pillow
+        except Exception:
             try:
                 return TemplateEngine._remove_background_pillow(image)
             except Exception:
-                if image.mode != 'RGBA':
-                    return image.convert('RGBA')
                 return image
+
+    @staticmethod
+    def _remove_checkered_background(image, tolerance=20):
+        """
+        Xóa checkered background (ô vuông đen xám xen kẽ) khỏi ảnh.
+
+        Checkered background thường có 2 màu xám xen kẽ:
+        - Màu sáng: ~192-210 (RGB)
+        - Màu tối: ~128-150 (RGB)
+
+        Args:
+            image: PIL Image object (RGBA)
+            tolerance: Độ chênh lệch cho phép khi xác định màu xám
+
+        Returns:
+            PIL Image: Ảnh với checkered background đã được xóa
+        """
+        import numpy as np
+
+        if image.mode != 'RGBA':
+            image = image.convert('RGBA')
+
+        arr = np.array(image)
+        height, width = arr.shape[:2]
+
+        r = arr[:, :, 0].astype(np.int16)
+        g = arr[:, :, 1].astype(np.int16)
+        b = arr[:, :, 2].astype(np.int16)
+        a = arr[:, :, 3]
+
+        # Kiểm tra màu xám (R ≈ G ≈ B)
+        diff_rg = np.abs(r - g)
+        diff_gb = np.abs(g - b)
+        diff_rb = np.abs(r - b)
+        max_diff = np.maximum(np.maximum(diff_rg, diff_gb), diff_rb)
+        is_gray = max_diff < tolerance
+
+        # Tính giá trị trung bình màu
+        avg = (r + g + b) // 3
+
+        # Các dải màu checkered phổ biến
+        # Photoshop/GIMP checkered: ~128 (dark) và ~192-204 (light)
+        checkered_ranges = [
+            (120, 170),  # Dark gray squares
+            (185, 215),  # Light gray squares
+            (100, 135),  # Very dark gray
+            (215, 250),  # Very light gray (near white)
+        ]
+
+        checkered_mask = np.zeros((height, width), dtype=bool)
+        for low, high in checkered_ranges:
+            range_mask = (avg >= low) & (avg <= high)
+            checkered_mask = checkered_mask | range_mask
+
+        # Pixel phải là màu xám VÀ nằm trong dải checkered
+        remove_mask = is_gray & checkered_mask
+
+        # Set alpha = 0 cho các pixel checkered
+        arr[:, :, 3] = np.where(remove_mask, 0, a)
+
+        return Image.fromarray(arr, mode='RGBA')
 
     @staticmethod
     def _clean_alpha_channel(image, alpha_threshold=10):

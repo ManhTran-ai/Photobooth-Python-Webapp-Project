@@ -527,6 +527,9 @@ async function initCollageUI(sessionId) {
         svg.appendChild(border);
     }
 
+    // Expose renderPreview globally so session.js can call it
+    window.refreshCollagePreview = renderPreview;
+
     applyPreviewBtn.addEventListener('click', () => {
         renderPreview();
     });
