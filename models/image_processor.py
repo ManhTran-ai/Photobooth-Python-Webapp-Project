@@ -5,6 +5,8 @@ Handles image manipulation including flipping and filtering
 from PIL import Image, ImageEnhance, ImageFilter
 import io
 import os
+import numpy as np
+import cv2
 
 
 class ImageProcessor:
@@ -48,6 +50,56 @@ class ImageProcessor:
         # For now, only 'none' filter is supported (flip only)
         # Filter processing is handled by FilterEngine class
         return image
+
+
+    # -------------------------
+    # Phase 0: Preprocessing helpers
+    # -------------------------
+    @staticmethod
+    def preprocess_for_model(image, target_size=(160, 160)):
+        """
+        Prepare a PIL Image for model input: convert to RGB, resize, and
+        return a numpy float32 array normalized to [0,1].
+        """
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        img = image.resize((int(target_size[0]), int(target_size[1])), Image.LANCZOS)
+        arr = np.asarray(img).astype('float32') / 255.0
+        return arr
+
+    @staticmethod
+    def is_blurry(image, threshold=100.0):
+        """
+        Heuristic blur detection using variance of Laplacian.
+        Returns True if image is considered blurry.
+        """
+        # Convert PIL Image to grayscale numpy
+        if image.mode != 'L':
+            gray = image.convert('L')
+        else:
+            gray = image
+        arr = np.asarray(gray)
+        # Use OpenCV Laplacian variance
+        try:
+            var = cv2.Laplacian(arr, cv2.CV_64F).var()
+        except Exception:
+            # Fallback: compute simple variance of gradient using numpy
+            gy, gx = np.gradient(arr.astype('float32'))
+            var = (gx ** 2 + gy ** 2).var()
+        return float(var) < float(threshold)
+
+    @staticmethod
+    def is_low_light(image, brightness_threshold=80):
+        """
+        Simple brightness check. Returns True if average brightness is below threshold.
+        """
+        if image.mode != 'L':
+            gray = image.convert('L')
+        else:
+            gray = image
+        arr = np.asarray(gray)
+        mean_brightness = arr.mean()
+        return mean_brightness < brightness_threshold
 
 
     @staticmethod
