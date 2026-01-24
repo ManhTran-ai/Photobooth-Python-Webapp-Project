@@ -41,8 +41,12 @@ class FaceDetector:
         if isinstance(image, Image.Image):
             img_array = np.array(image)
             # PIL is RGB, convert to BGR for OpenCV
-            if len(img_array.shape) == 3 and img_array.shape[2] == 3:
-                img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+            if len(img_array.shape) == 3:
+                # Handle RGBA by converting to RGB first
+                if img_array.shape[2] == 4:
+                    img_array = cv2.cvtColor(img_array, cv2.COLOR_RGBA2RGB)
+                if img_array.shape[2] == 3:
+                    img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
         else:
             img_array = image.copy()
 
@@ -231,7 +235,17 @@ class FaceDetector:
         return Image.fromarray(img_rgb)
 
     def get_face_positions_for_stickers(self, image, sticker_type='hat'):
+        """
+        Get optimal positions for placing stickers on detected faces.
 
+        Supported sticker types:
+        - hat: Mũ - đặt trên đầu
+        - glasses: Kính - đặt ở mắt
+        - ears: Tai thỏ - đặt trên đầu
+        - mustache: Râu - đặt dưới mũi
+        - noel_hat: Nón Noel - đặt trên đầu, nghiêng
+        - bow: Nơ - đặt trên đầu, bên phải
+        """
         faces = self.detect_faces(image)
         positions = []
 
@@ -240,15 +254,24 @@ class FaceDetector:
             cx, cy = face['center']
 
             if sticker_type == 'hat':
-                # Hat goes above head
+                # Mũ - đặt trên đầu, căn giữa
                 pos = {
                     'x': cx,
-                    'y': y - int(h * 0.3),  # Above face
-                    'scale': w / 100,  # Relative scale
+                    'y': y - int(h * 0.15),  # Trên đầu
+                    'scale': w / 100,
                     'anchor': 'bottom-center'
                 }
+            elif sticker_type == 'noel_hat':
+                # Nón Noel - đặt trên đầu, hơi nghiêng về bên phải
+                pos = {
+                    'x': cx + int(w * 0.1),  # Lệch phải một chút
+                    'y': y - int(h * 0.25),  # Trên đầu cao hơn
+                    'scale': w / 80,
+                    'anchor': 'bottom-center',
+                    'rotation': -15  # Nghiêng sang phải
+                }
             elif sticker_type == 'glasses':
-                # Glasses at eye level (approximately 1/3 from top of face)
+                # Kính - đặt ở vị trí mắt (khoảng 1/3 từ trên xuống)
                 pos = {
                     'x': cx,
                     'y': y + int(h * 0.35),
@@ -256,18 +279,26 @@ class FaceDetector:
                     'anchor': 'center'
                 }
             elif sticker_type == 'ears':
-                # Ears on sides of head
+                # Tai thỏ - đặt trên đầu
                 pos = {
                     'x': cx,
-                    'y': y - int(h * 0.1),
-                    'scale': w / 60,
+                    'y': y - int(h * 0.2),
+                    'scale': w / 70,
                     'anchor': 'bottom-center'
                 }
             elif sticker_type == 'mustache':
-                # Mustache below nose (approximately 2/3 from top)
+                # Râu - đặt dưới mũi (khoảng 2/3 từ trên xuống)
                 pos = {
                     'x': cx,
-                    'y': y + int(h * 0.7),
+                    'y': y + int(h * 0.68),
+                    'scale': w / 100,
+                    'anchor': 'center'
+                }
+            elif sticker_type == 'bow':
+                # Nơ - đặt trên đầu, bên phải
+                pos = {
+                    'x': cx + int(w * 0.35),  # Bên phải đầu
+                    'y': y - int(h * 0.05),  # Trên đầu
                     'scale': w / 120,
                     'anchor': 'center'
                 }
